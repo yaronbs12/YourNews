@@ -1,40 +1,41 @@
 # YourNews
 
-YourNews is a personalized news recommendation system that learns what each user actually wants to read.
+YourNews is a personalized news recommendation backend focused on a data pipeline and feedback-driven personalization.
 
-The project will collect articles from open sources such as RSS feeds and Hacker News, classify them by topic, rank them based on user preferences, and improve recommendations over time using user feedback.
-
-## Main Idea
-
-Most news feeds are noisy, repetitive, and not really personalized.
-
-YourNews aims to create a personal news digest that gets better over time through simple feedback:
-
-- Interesting
-- Neutral
-- Not interesting
-
-## Planned MVP
-
-- Collect articles from RSS feeds and Hacker News
-- Store articles in PostgreSQL
-- Detect duplicate articles
-- Classify articles into topics
-- Rank articles based on user preferences
-- Generate a personalized digest
-- Save user feedback and update preferences
-
-## Tech Stack
-
-Planned stack:
-
-- Python
+## Stack
 - FastAPI
 - PostgreSQL
 - SQLAlchemy
-- Docker
+- Alembic
+- Pydantic Settings
+- Docker Compose
 - pytest
 
-## Status
+## Quick start
+1. Copy environment file:
+   ```bash
+   cp .env.example .env
+   ```
+2. Start services:
+   ```bash
+   docker compose up --build
+   ```
+3. Health check:
+   - `GET http://localhost:8000/health`
 
-Early development.
+## Migrations
+Run migrations in app container:
+```bash
+docker compose exec app alembic upgrade head
+```
+
+## Local test run
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pytest
+```
+
+## Current scope
+Implemented only backend skeleton and schema foundation. No RSS ingestion, Hacker News ingestion, AI summaries, or frontend yet.
