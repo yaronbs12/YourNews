@@ -10,6 +10,7 @@ YourNews is a personalized news recommendation backend focused on a data pipelin
 - Pydantic Settings
 - Docker Compose
 - pytest
+- feedparser
 
 ## Quick start
 1. Copy environment file:
@@ -38,4 +39,4 @@ pytest
 ```
 
 ## Current scope
-Implemented only backend skeleton and schema foundation. No RSS ingestion, Hacker News ingestion, AI summaries, or frontend yet.
+Implemented backend skeleton, schema foundation, and MVP RSS ingestion. Hacker News ingestion, AI summaries, and frontend are not implemented yet.
