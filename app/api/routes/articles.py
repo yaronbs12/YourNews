@@ -48,3 +48,29 @@ def list_sources(db: Session = Depends(get_db)) -> list[SourceRead]:
         )
         for source in sources
     ]
+
+
+@router.get("/digest/preview", response_model=DigestPreview)
+def preview_digest(limit: int = 10, db: Session = Depends(get_db)) -> DigestPreview:
+    """Return a lightweight digest preview without persisting Digest rows."""
+
+    clamped_limit = max(1, min(limit, 50))
+    rows = db.execute(
+        select(Article, ArticleSource.name)
+        .join(ArticleSource, Article.source_id == ArticleSource.id)
+        .order_by(Article.created_at.desc())
+        .limit(clamped_limit)
+    ).all()
+    items = [
+        DigestPreviewItem(
+            rank=index,
+            article_id=article.id,
+            title=article.title,
+            url=article.url,
+            source_name=source_name,
+            published_at=article.published_at,
+            created_at=article.created_at,
+        )
+        for index, (article, source_name) in enumerate(rows, start=1)
+    ]
+    return DigestPreview(items=items)
