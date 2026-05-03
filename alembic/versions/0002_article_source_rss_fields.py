@@ -15,7 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("article_sources", sa.Column("source_type", sa.String(length=50), nullable=False, server_default=sa.text("'rss'")))
+    op.add_column("article_sources", sa.Column("source_type", sa.String(length=50), nullable=False, server_default="rss"))
     op.add_column("article_sources", sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("true")))
     op.add_column("article_sources", sa.Column("last_fetched_at", sa.DateTime(timezone=True), nullable=True))
 
