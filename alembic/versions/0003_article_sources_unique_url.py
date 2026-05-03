@@ -15,6 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Re-point article foreign keys to the kept source row (lowest id per duplicated URL).
     op.execute(
         """
         UPDATE articles AS a
@@ -34,6 +35,7 @@ def upgrade() -> None:
         """
     )
 
+    # Remove duplicated source rows after articles now point at the kept row.
     op.execute(
         """
         DELETE FROM article_sources AS src
@@ -52,6 +54,7 @@ def upgrade() -> None:
         """
     )
 
+    # Enforce one source row per URL.
     op.create_unique_constraint("uq_article_sources_url", "article_sources", ["url"])
 
 
