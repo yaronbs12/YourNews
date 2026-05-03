@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.schemas import ArticleRead, SourceRead
+from app.api.schemas import ArticleRead, DigestPreview, DigestPreviewItem, SourceRead
 from app.models.article import Article
 from app.models.article_source import ArticleSource
 
