@@ -11,7 +11,7 @@ def get_or_create_article_source(session: Session, name: str, url: str) -> Artic
     if source is not None:
         return source
 
-    source = ArticleSource(name=name, url=url)
+    source = ArticleSource(name=name, url=url, source_type="rss", enabled=True)
     session.add(source)
     session.flush()
     return source
