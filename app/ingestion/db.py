@@ -7,6 +7,10 @@ from app.models.article_source import ArticleSource
 
 
 def get_or_create_article_source(session: Session, name: str, url: str) -> ArticleSource:
+    source = session.scalar(select(ArticleSource).where(ArticleSource.url == url))
+    if source is not None:
+        return source
+
     source = session.scalar(select(ArticleSource).where(ArticleSource.name == name))
     if source is not None:
         return source
