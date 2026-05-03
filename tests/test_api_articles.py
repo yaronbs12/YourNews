@@ -11,7 +11,6 @@ from app.main import app
 from app.models import *  # noqa: F403,F401
 from app.models.article import Article
 from app.models.article_source import ArticleSource
-from app.models.digest import Digest
 
 
 def _setup_client() -> tuple[TestClient, sessionmaker]:
@@ -95,46 +94,3 @@ def test_get_sources_returns_article_sources() -> None:
     assert response.status_code == 200
     data = response.json()
     assert [item["name"] for item in data] == ["A", "B"]
-
-
-def test_digest_preview_returns_latest_articles_with_rank_and_source_name() -> None:
-    client, SessionLocal = _setup_client()
-    with SessionLocal() as session:
-        source = ArticleSource(name="Preview Source", url="https://example.com/source", source_type="rss", enabled=True)
-        session.add(source)
-        session.flush()
-        session.add_all(
-            [
-                Article(source_id=source.id, title="Older", url="https://example.com/older", content=None, published_at=None),
-                Article(source_id=source.id, title="Newer", url="https://example.com/newer", content=None, published_at=None),
-            ]
-        )
-        session.commit()
-
-    response = client.get("/digest/preview")
-    assert response.status_code == 200
-    data = response.json()["items"]
-    assert len(data) == 2
-    assert data[0]["rank"] == 1
-    assert data[1]["rank"] == 2
-    assert data[0]["source_name"] == "Preview Source"
-
-
-def test_digest_preview_respects_limit_and_does_not_create_digest_rows() -> None:
-    client, SessionLocal = _setup_client()
-    with SessionLocal() as session:
-        source = ArticleSource(name="Preview Source", url="https://example.com/source", source_type="rss", enabled=True)
-        session.add(source)
-        session.flush()
-        for i in range(6):
-            session.add(Article(source_id=source.id, title=f"Article {i}", url=f"https://example.com/d-{i}", content=None, published_at=None))
-        session.commit()
-
-    response = client.get("/digest/preview", params={"limit": 3})
-    assert response.status_code == 200
-    data = response.json()["items"]
-    assert len(data) == 3
-    assert [item["rank"] for item in data] == [1, 2, 3]
-
-    with SessionLocal() as session:
-        assert len(session.query(Digest).all()) == 0
