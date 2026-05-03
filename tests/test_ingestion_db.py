@@ -35,4 +35,8 @@ def test_insert_new_articles_skips_duplicate_urls() -> None:
         assert len(first_insert) == 1
         assert second_insert == []
         assert len(session.scalars(select(Article)).all()) == 1
-        assert len(session.scalars(select(ArticleSource)).all()) == 1
+        sources = session.scalars(select(ArticleSource)).all()
+        assert len(sources) == 1
+        assert sources[0].source_type == "rss"
+        assert sources[0].enabled is True
+        assert sources[0].last_fetched_at is None
