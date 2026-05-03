@@ -6,8 +6,19 @@ from app.api.deps import get_db
 from app.api.schemas import ArticleRead, DigestPreview, DigestPreviewItem, SourceRead
 from app.models.article import Article
 from app.models.article_source import ArticleSource
+from app.models.associations import ArticleTopic
+from app.models.topic import Topic
 
 router = APIRouter()
+
+
+def _get_article_topics(db: Session, article_id: int) -> list[str]:
+    return db.scalars(
+        select(Topic.name)
+        .join(ArticleTopic, ArticleTopic.topic_id == Topic.id)
+        .where(ArticleTopic.article_id == article_id)
+        .order_by(Topic.name.asc())
+    ).all()
 
 
 @router.get("/articles", response_model=list[ArticleRead])
@@ -29,6 +40,7 @@ def list_articles(limit: int = 20, db: Session = Depends(get_db)) -> list[Articl
             published_at=article.published_at,
             created_at=article.created_at,
             source_name=source_name,
+            topics=_get_article_topics(db, article.id),
         )
         for article, source_name in rows
     ]
@@ -70,6 +82,7 @@ def preview_digest(limit: int = 10, db: Session = Depends(get_db)) -> DigestPrev
             source_name=source_name,
             published_at=article.published_at,
             created_at=article.created_at,
+            topics=_get_article_topics(db, article.id),
         )
         for index, (article, source_name) in enumerate(rows, start=1)
     ]

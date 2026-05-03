@@ -11,7 +11,9 @@ from app.main import app
 from app.models import *  # noqa: F403,F401
 from app.models.article import Article
 from app.models.article_source import ArticleSource
+from app.models.associations import ArticleTopic
 from app.models.digest import Digest
+from app.models.topic import Topic
 
 
 def _setup_client() -> tuple[TestClient, sessionmaker]:
@@ -80,6 +82,31 @@ def test_get_articles_includes_source_name() -> None:
     assert response.json()[0]["source_name"] == "BBC World"
 
 
+def test_get_articles_includes_topics_and_empty_topics() -> None:
+    client, SessionLocal = _setup_client()
+    with SessionLocal() as session:
+        source = ArticleSource(name="Topic Source", url="https://example.com/topics", source_type="rss", enabled=True)
+        session.add(source)
+        session.flush()
+
+        with_topics = Article(source_id=source.id, title="With Topics", url="https://example.com/with-topics", content=None, published_at=None)
+        no_topics = Article(source_id=source.id, title="No Topics", url="https://example.com/no-topics", content=None, published_at=None)
+        session.add_all([with_topics, no_topics])
+        session.flush()
+
+        ai_topic = Topic(name="ai")
+        session.add(ai_topic)
+        session.flush()
+        session.add(ArticleTopic(article_id=with_topics.id, topic_id=ai_topic.id, relevance_score=3))
+        session.commit()
+
+    response = client.get("/articles", params={"limit": 10})
+    assert response.status_code == 200
+    by_title = {item["title"]: item for item in response.json()}
+    assert by_title["With Topics"]["topics"] == ["ai"]
+    assert by_title["No Topics"]["topics"] == []
+
+
 def test_get_sources_returns_article_sources() -> None:
     client, SessionLocal = _setup_client()
     with SessionLocal() as session:
@@ -118,6 +145,27 @@ def test_digest_preview_returns_latest_articles_with_rank_and_source_name() -> N
     assert data[0]["rank"] == 1
     assert data[1]["rank"] == 2
     assert data[0]["source_name"] == "Preview Source"
+
+
+def test_digest_preview_includes_topics() -> None:
+    client, SessionLocal = _setup_client()
+    with SessionLocal() as session:
+        source = ArticleSource(name="Preview Source", url="https://example.com/preview-topics", source_type="rss", enabled=True)
+        session.add(source)
+        session.flush()
+        article = Article(source_id=source.id, title="Topic Story", url="https://example.com/topic-story", content=None, published_at=None)
+        session.add(article)
+        session.flush()
+
+        topic = Topic(name="business")
+        session.add(topic)
+        session.flush()
+        session.add(ArticleTopic(article_id=article.id, topic_id=topic.id, relevance_score=4))
+        session.commit()
+
+    response = client.get("/digest/preview")
+    assert response.status_code == 200
+    assert response.json()["items"][0]["topics"] == ["business"]
 
 
 def test_digest_preview_respects_limit_and_does_not_create_digest_rows() -> None:

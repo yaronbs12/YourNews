@@ -18,6 +18,7 @@ class ArticleRead(BaseModel):
     published_at: datetime | None
     created_at: datetime
     source_name: str
+    topics: list[str]
 
 
 class SourceRead(BaseModel):
@@ -39,6 +40,7 @@ class DigestPreviewItem(BaseModel):
     source_name: str
     published_at: datetime | None
     created_at: datetime
+    topics: list[str]
 
 
 class DigestPreview(BaseModel):
