@@ -7,6 +7,8 @@ __all__ = [
     "SourceRead",
     "DigestPreviewItem",
     "DigestPreview",
+    "FeedbackCreate",
+    "FeedbackRead",
 ]
 
 
@@ -47,3 +49,17 @@ class DigestPreview(BaseModel):
     """Read-only digest preview payload."""
 
     items: list[DigestPreviewItem]
+
+
+class FeedbackCreate(BaseModel):
+    user_id: int
+    article_id: int
+    label: str
+
+
+class FeedbackRead(BaseModel):
+    id: int
+    user_id: int
+    article_id: int
+    label: str
+    created_at: datetime

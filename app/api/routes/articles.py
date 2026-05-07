@@ -1,13 +1,25 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.schemas import ArticleRead, DigestPreview, DigestPreviewItem, SourceRead
+from app.api.schemas import (
+    ArticleRead,
+    DigestPreview,
+    DigestPreviewItem,
+    FeedbackCreate,
+    FeedbackRead,
+    SourceRead,
+)
 from app.models.article import Article
 from app.models.article_source import ArticleSource
 from app.models.associations import ArticleTopic
 from app.models.topic import Topic
+from app.feedback.service import (
+    FeedbackNotFoundError,
+    FeedbackValidationError,
+    create_feedback_and_update_preferences,
+)
 from app.ranking.service import rank_articles_for_digest
 
 router = APIRouter()
@@ -83,3 +95,26 @@ def preview_digest(limit: int = 10, db: Session = Depends(get_db)) -> DigestPrev
         for index, ranked_article in enumerate(ranked_articles, start=1)
     ]
     return DigestPreview(items=items)
+
+
+@router.post("/feedback", response_model=FeedbackRead)
+def create_feedback(payload: FeedbackCreate, db: Session = Depends(get_db)) -> FeedbackRead:
+    try:
+        feedback = create_feedback_and_update_preferences(
+            session=db,
+            user_id=payload.user_id,
+            article_id=payload.article_id,
+            label=payload.label,
+        )
+    except FeedbackValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FeedbackNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return FeedbackRead(
+        id=feedback.id,
+        user_id=feedback.user_id,
+        article_id=feedback.article_id,
+        label=feedback.label.name,
+        created_at=feedback.created_at,
+    )
