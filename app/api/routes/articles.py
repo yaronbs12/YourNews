@@ -20,7 +20,7 @@ from app.feedback.service import (
     FeedbackValidationError,
     create_feedback_and_update_preferences,
 )
-from app.ranking.service import rank_articles_for_digest
+from app.ranking.service import RankingUserNotFoundError, rank_articles_for_digest
 
 router = APIRouter()
 
@@ -76,11 +76,18 @@ def list_sources(db: Session = Depends(get_db)) -> list[SourceRead]:
 
 
 @router.get("/digest/preview", response_model=DigestPreview)
-def preview_digest(limit: int = 10, db: Session = Depends(get_db)) -> DigestPreview:
+def preview_digest(
+    limit: int = 10,
+    user_id: int | None = None,
+    db: Session = Depends(get_db),
+) -> DigestPreview:
     """Return a lightweight digest preview without persisting Digest rows."""
 
     clamped_limit = max(1, min(limit, 50))
-    ranked_articles = rank_articles_for_digest(db, limit=clamped_limit)
+    try:
+        ranked_articles = rank_articles_for_digest(db, limit=clamped_limit, user_id=user_id)
+    except RankingUserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     items = [
         DigestPreviewItem(
             rank=index,
