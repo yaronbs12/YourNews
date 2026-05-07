@@ -19,6 +19,15 @@ def test_classify_article_text_detects_topics() -> None:
     assert "tech" in topics
     assert "security" in topics
     assert "business" in topics
+    assert "politics" in topics
+
+
+def test_classify_article_text_detects_world_topic() -> None:
+    topics = classify_article_text(
+        "Global leaders discuss foreign military conflict",
+        "The country faces war and diplomacy challenges.",
+    )
+
     assert "world" in topics
 
 
