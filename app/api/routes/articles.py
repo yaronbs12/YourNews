@@ -14,6 +14,7 @@ from app.api.schemas import (
 from app.models.article import Article
 from app.models.article_source import ArticleSource
 from app.models.associations import ArticleTopic
+from app.models.feedback import Feedback
 from app.models.topic import Topic
 from app.feedback.service import (
     FeedbackNotFoundError,
@@ -102,6 +103,35 @@ def preview_digest(
         for index, ranked_article in enumerate(ranked_articles, start=1)
     ]
     return DigestPreview(items=items)
+
+
+@router.get("/feedback", response_model=list[FeedbackRead])
+def list_feedback(
+    user_id: int | None = None,
+    article_id: int | None = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+) -> list[FeedbackRead]:
+    clamped_limit = max(1, min(limit, 100))
+    query = select(Feedback)
+    if user_id is not None:
+        query = query.where(Feedback.user_id == user_id)
+    if article_id is not None:
+        query = query.where(Feedback.article_id == article_id)
+
+    feedback_rows = db.scalars(
+        query.order_by(Feedback.created_at.desc(), Feedback.id.desc()).limit(clamped_limit)
+    ).all()
+    return [
+        FeedbackRead(
+            id=feedback.id,
+            user_id=feedback.user_id,
+            article_id=feedback.article_id,
+            label=feedback.label.name,
+            created_at=feedback.created_at,
+        )
+        for feedback in feedback_rows
+    ]
 
 
 @router.post("/feedback", response_model=FeedbackRead)

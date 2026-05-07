@@ -59,3 +59,39 @@ After the script prints the demo user id, inspect these endpoints:
 - `http://localhost:8000/users`
 - `http://localhost:8000/users/{user_id}/preferences`
 - `http://localhost:8000/digest/preview?user_id={user_id}`
+
+## Manual personalization test
+Use this flow when you want to manually verify feedback-driven personalization without running the demo script again. The examples use `curl.exe` syntax that works in Windows PowerShell; replace `{user_id}`, `{interesting_article_id}`, and `{not_interesting_article_id}` with values from your local data.
+
+1. Create or reuse a test user:
+   ```powershell
+   curl.exe -X POST http://127.0.0.1:8000/users `
+     -H "Content-Type: application/json" `
+     -d "{\"email\":\"demo@yournews.local\"}"
+   ```
+
+2. Inspect recent articles and choose two different `article_id` values:
+   ```powershell
+   curl.exe "http://127.0.0.1:8000/articles?limit=10"
+   ```
+
+3. Send positive feedback for one article:
+   ```powershell
+   curl.exe -X POST http://127.0.0.1:8000/feedback `
+     -H "Content-Type: application/json" `
+     -d "{\"user_id\":{user_id},\"article_id\":{interesting_article_id},\"label\":\"INTERESTING\"}"
+   ```
+
+4. Send negative feedback for a different article:
+   ```powershell
+   curl.exe -X POST http://127.0.0.1:8000/feedback `
+     -H "Content-Type: application/json" `
+     -d "{\"user_id\":{user_id},\"article_id\":{not_interesting_article_id},\"label\":\"NOT_INTERESTING\"}"
+   ```
+
+5. Inspect the raw feedback rows, accumulated preferences, and personalized digest:
+   ```powershell
+   curl.exe "http://127.0.0.1:8000/feedback?user_id={user_id}"
+   curl.exe "http://127.0.0.1:8000/users/{user_id}/preferences"
+   curl.exe "http://127.0.0.1:8000/digest/preview?user_id={user_id}"
+   ```
