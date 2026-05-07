@@ -168,6 +168,47 @@ def test_digest_preview_includes_topics() -> None:
     assert response.json()["items"][0]["topics"] == ["business"]
 
 
+def test_digest_preview_returns_ranked_results_not_only_newest() -> None:
+    client, SessionLocal = _setup_client()
+    now = datetime(2026, 5, 7, tzinfo=timezone.utc)
+    with SessionLocal() as session:
+        source = ArticleSource(name="Ranking Source", url="https://example.com/ranking", source_type="rss", enabled=True)
+        session.add(source)
+        session.flush()
+
+        newest_general = Article(
+            source_id=source.id,
+            title="Newest General",
+            url="https://example.com/newest-general",
+            content=None,
+            published_at=None,
+            created_at=now,
+        )
+        older_ai = Article(
+            source_id=source.id,
+            title="Older AI",
+            url="https://example.com/older-ai",
+            content=None,
+            published_at=None,
+            created_at=now.replace(day=6),
+        )
+        session.add_all([newest_general, older_ai])
+        session.flush()
+
+        ai_topic = Topic(name="ai")
+        session.add(ai_topic)
+        session.flush()
+        session.add(ArticleTopic(article_id=older_ai.id, topic_id=ai_topic.id, relevance_score=5))
+        session.commit()
+
+    response = client.get("/digest/preview", params={"limit": 2})
+    assert response.status_code == 200
+    data = response.json()["items"]
+    assert [item["title"] for item in data] == ["Older AI", "Newest General"]
+    assert data[0]["topics"] == ["ai"]
+    assert data[1]["topics"] == []
+
+
 def test_digest_preview_respects_limit_and_does_not_create_digest_rows() -> None:
     client, SessionLocal = _setup_client()
     with SessionLocal() as session:

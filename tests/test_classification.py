@@ -26,6 +26,21 @@ def test_classify_article_text_detects_all_topics_case_insensitively() -> None:
     assert "world" in text_topics
 
 
+def test_classify_article_text_detects_new_topics() -> None:
+    topics = classify_article_text(
+        "NASA science study links climate and health policy",
+        "Doctors discuss vaccine research while a football team, Netflix movie, bitcoin fund, and solar energy story trend.",
+    )
+
+    assert "science" in topics
+    assert "health" in topics
+    assert "sports" in topics
+    assert "politics" in topics
+    assert "finance" in topics
+    assert "climate" in topics
+    assert "entertainment" in topics
+
+
 def test_classify_article_text_returns_general_when_no_match() -> None:
     assert classify_article_text("Recipe", "Fresh basil and tomatoes") == ["general"]
 

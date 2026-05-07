@@ -8,6 +8,7 @@ from app.models.article import Article
 from app.models.article_source import ArticleSource
 from app.models.associations import ArticleTopic
 from app.models.topic import Topic
+from app.ranking.service import rank_articles_for_digest
 
 router = APIRouter()
 
@@ -67,23 +68,18 @@ def preview_digest(limit: int = 10, db: Session = Depends(get_db)) -> DigestPrev
     """Return a lightweight digest preview without persisting Digest rows."""
 
     clamped_limit = max(1, min(limit, 50))
-    rows = db.execute(
-        select(Article, ArticleSource.name)
-        .join(ArticleSource, Article.source_id == ArticleSource.id)
-        .order_by(Article.created_at.desc())
-        .limit(clamped_limit)
-    ).all()
+    ranked_articles = rank_articles_for_digest(db, limit=clamped_limit)
     items = [
         DigestPreviewItem(
             rank=index,
-            article_id=article.id,
-            title=article.title,
-            url=article.url,
-            source_name=source_name,
-            published_at=article.published_at,
-            created_at=article.created_at,
-            topics=_get_article_topics(db, article.id),
+            article_id=ranked_article.article.id,
+            title=ranked_article.article.title,
+            url=ranked_article.article.url,
+            source_name=ranked_article.source_name,
+            published_at=ranked_article.article.published_at,
+            created_at=ranked_article.article.created_at,
+            topics=ranked_article.topics,
         )
-        for index, (article, source_name) in enumerate(rows, start=1)
+        for index, ranked_article in enumerate(ranked_articles, start=1)
     ]
     return DigestPreview(items=items)
