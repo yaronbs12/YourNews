@@ -9,6 +9,9 @@ __all__ = [
     "DigestPreview",
     "FeedbackCreate",
     "FeedbackRead",
+    "UserCreate",
+    "UserRead",
+    "UserPreferenceRead",
 ]
 
 
@@ -63,3 +66,18 @@ class FeedbackRead(BaseModel):
     article_id: int
     label: str
     created_at: datetime
+
+
+class UserCreate(BaseModel):
+    email: str
+
+
+class UserRead(BaseModel):
+    id: int
+    email: str
+    created_at: datetime
+
+
+class UserPreferenceRead(BaseModel):
+    topic: str
+    weight: int

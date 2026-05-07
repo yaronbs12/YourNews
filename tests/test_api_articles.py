@@ -14,6 +14,8 @@ from app.models.article_source import ArticleSource
 from app.models.associations import ArticleTopic
 from app.models.digest import Digest
 from app.models.topic import Topic
+from app.models.user import User
+from app.models.user_preference import UserPreference
 
 
 def _setup_client() -> tuple[TestClient, sessionmaker]:
@@ -227,3 +229,60 @@ def test_digest_preview_respects_limit_and_does_not_create_digest_rows() -> None
 
     with SessionLocal() as session:
         assert len(session.query(Digest).all()) == 0
+
+
+def test_digest_preview_with_user_id_uses_personalized_preferences() -> None:
+    client, SessionLocal = _setup_client()
+    now = datetime(2026, 5, 7, tzinfo=timezone.utc)
+    with SessionLocal() as session:
+        source = ArticleSource(name="Personal Source", url="https://example.com/personal-source", source_type="rss", enabled=True)
+        session.add(source)
+        session.flush()
+
+        ai = Article(
+            source_id=source.id,
+            title="AI Story",
+            url="https://example.com/api-ai-story",
+            content=None,
+            published_at=None,
+            created_at=now,
+        )
+        business = Article(
+            source_id=source.id,
+            title="Business Story",
+            url="https://example.com/api-business-story",
+            content=None,
+            published_at=None,
+            created_at=now.replace(hour=23),
+        )
+        session.add_all([ai, business])
+        session.flush()
+
+        ai_topic = Topic(name="ai")
+        business_topic = Topic(name="business")
+        user = User(email="digest@example.com")
+        session.add_all([ai_topic, business_topic, user])
+        session.flush()
+        session.add_all(
+            [
+                ArticleTopic(article_id=ai.id, topic_id=ai_topic.id, relevance_score=5),
+                ArticleTopic(article_id=business.id, topic_id=business_topic.id, relevance_score=5),
+                UserPreference(user_id=user.id, topic_id=business_topic.id, weight=5),
+            ]
+        )
+        user_id = user.id
+        session.commit()
+
+    response = client.get("/digest/preview", params={"limit": 2, "user_id": user_id})
+    assert response.status_code == 200
+    data = response.json()["items"]
+    assert [item["title"] for item in data] == ["Business Story", "AI Story"]
+
+
+def test_digest_preview_unknown_user_id_returns_404() -> None:
+    client, _ = _setup_client()
+
+    response = client.get("/digest/preview", params={"user_id": 999})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "User not found"
