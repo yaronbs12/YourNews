@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YourNews MVP Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">YourNews MVP</p>
+        <h1>Dashboard</h1>
+      </div>
+      <p class="subtitle">Create a demo user, inspect a personalized digest, submit feedback, and watch topic preferences change.</p>
+    </header>
+
+    <main class="layout">
+      <section class="card user-card" aria-labelledby="user-heading">
+        <h2 id="user-heading">User</h2>
+        <label for="email-input">Email</label>
+        <div class="inline-form">
+          <input id="email-input" type="email" value="demo@yournews.local" placeholder="you@example.com" autocomplete="email" />
+          <button id="create-user-button" type="button">Create / reuse user</button>
+        </div>
+        <p class="selected-user">Selected user_id: <strong id="selected-user-id">none</strong></p>
+        <p id="user-status" class="status" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="digest-heading">
+        <div class="section-title-row">
+          <h2 id="digest-heading">Personalized digest</h2>
+          <button id="load-digest-button" type="button">Load digest</button>
+        </div>
+        <p class="hint">Loads <code>/digest/preview?user_id={user_id}</code>. Use the feedback buttons to tune preferences.</p>
+        <p id="digest-status" class="status digest-status" role="status" aria-live="polite"></p>
+        <div id="digest-list" class="article-list empty">Create/select a user, then load a digest.</div>
+      </section>
+
+      <section class="card" aria-labelledby="preferences-heading">
+        <div class="section-title-row">
+          <h2 id="preferences-heading">Preferences</h2>
+          <button id="load-preferences-button" type="button">Reload preferences</button>
+        </div>
+        <p class="hint">Loads <code>/users/{user_id}/preferences</code>.</p>
+        <div id="preferences-list" class="preferences-list empty">No preferences loaded.</div>
+      </section>
+
+      <section class="card" aria-labelledby="recent-heading">
+        <div class="section-title-row">
+          <h2 id="recent-heading">Recent articles</h2>
+          <button id="load-articles-button" type="button">Load recent</button>
+        </div>
+        <p class="hint">Loads <code>/articles?limit=20</code>.</p>
+        <div id="articles-list" class="article-list empty">No articles loaded.</div>
+      </section>
+    </main>
+
+    <template id="article-template">
+      <article class="article-item">
+        <div class="article-main">
+          <a class="article-title" target="_blank" rel="noreferrer"></a>
+          <div class="meta"></div>
+          <div class="topics"></div>
+        </div>
+        <div class="feedback-actions" aria-label="Feedback actions"></div>
+      </article>
+    </template>
+
+    <script src="/static/dashboard.js" defer></script>
+  </body>
+</html>

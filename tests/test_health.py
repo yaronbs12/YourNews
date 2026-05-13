@@ -8,3 +8,24 @@ def test_health_endpoint() -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "YourNews"}
+
+
+def test_dashboard_root_serves_index() -> None:
+    client = TestClient(app)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "YourNews MVP Dashboard" in response.text
+
+
+def test_dashboard_static_javascript_served() -> None:
+    client = TestClient(app)
+    response = client.get("/static/dashboard.js")
+    assert response.status_code == 200
+    assert "loadDigest" in response.text
+
+
+def test_dashboard_static_stylesheet_served() -> None:
+    client = TestClient(app)
+    response = client.get("/static/styles.css")
+    assert response.status_code == 200
+    assert "article-list" in response.text
