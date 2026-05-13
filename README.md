@@ -23,6 +23,8 @@ YourNews is a personalized news recommendation backend focused on a data pipelin
    ```
 3. Health check:
    - `GET http://localhost:8000/health`
+4. Open the MVP dashboard:
+   - `http://127.0.0.1:8000/`
 
 ## Migrations
 Run migrations in app container:
@@ -39,7 +41,26 @@ pytest
 ```
 
 ## Current scope
-Implemented backend skeleton, schema foundation, and MVP RSS ingestion. Hacker News ingestion, AI summaries, and frontend are not implemented yet.
+Implemented backend skeleton, schema foundation, MVP RSS ingestion, topic classification, feedback-driven personalization, digest preview, and a minimal static frontend dashboard. Hacker News ingestion, AI summaries, authentication, and deployment are not implemented yet.
+
+
+## MVP dashboard
+Open the dashboard after starting the FastAPI app:
+
+```text
+http://127.0.0.1:8000/
+```
+
+Basic dashboard flow:
+
+1. Enter an email address and click **Create / reuse user**. The dashboard calls `POST /users` and shows the selected `user_id`.
+2. Click **Load digest** to fetch `GET /digest/preview?user_id={user_id}` and inspect ranked articles with title, source, topics, and `article_id`.
+3. Click **Interesting**, **Neutral**, or **Not interesting** on digest items to send `POST /feedback`.
+4. Click **Reload preferences** to refresh `GET /users/{user_id}/preferences` and inspect topic weights.
+5. Reload the digest to see how feedback-adjusted preferences affect ranking.
+6. Use **Load recent** to inspect `GET /articles?limit=20`.
+
+The dashboard is intentionally MVP-simple: static HTML/CSS/JavaScript served by FastAPI, with no build step, authentication, or external JavaScript dependencies.
 
 ## Demo workflow
 Run this workflow to exercise the MVP end-to-end with seeded RSS sources, ingestion, topic classification, feedback-driven preferences, and personalized digest ranking.
