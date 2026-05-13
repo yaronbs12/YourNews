@@ -15,6 +15,8 @@ def test_dashboard_root_serves_index() -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "YourNews MVP Dashboard" in response.text
+    assert "Not signed in yet." in response.text
+    assert "Selected user_id" not in response.text
 
 
 def test_dashboard_static_javascript_served() -> None:

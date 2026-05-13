@@ -53,8 +53,8 @@ http://127.0.0.1:8000/
 
 Basic dashboard flow:
 
-1. Enter an email address and click **Create / reuse user**. The dashboard calls `POST /users` and shows the selected `user_id`.
-2. Click **Load digest** to fetch `GET /digest/preview?user_id={user_id}` and inspect ranked articles with title, source, topics, and `article_id`.
+1. Enter an email address and click **Create / reuse user**. The dashboard calls `POST /users` and shows a friendly signed-in message.
+2. Click **Load digest** to fetch `GET /digest/preview?user_id={user_id}` and inspect ranked articles with title, source, and topics.
 3. Click **Interesting**, **Neutral**, or **Not interesting** on digest items to send `POST /feedback`; the dashboard then refreshes preferences and digest results automatically.
 4. Click **Reload preferences** any time to manually refresh `GET /users/{user_id}/preferences` and inspect topic weights.
 5. Use **Load digest** again whenever you want to manually reload feedback-adjusted ranking.
