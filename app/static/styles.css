@@ -135,6 +135,7 @@ h2 {
 }
 
 .inline-form,
+.button-row,
 .section-title-row {
   align-items: center;
   display: flex;
@@ -189,9 +190,15 @@ h2 {
   text-decoration: underline;
 }
 
-.meta {
+.meta,
+.score-breakdown {
   font-size: 0.9rem;
   margin: 0.2rem 0 0.45rem;
+}
+
+.score-breakdown {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .topics {
@@ -227,6 +234,7 @@ h2 {
   .site-header,
   .article-item,
   .inline-form,
+  .button-row,
   .section-title-row {
     align-items: stretch;
     flex-direction: column;
