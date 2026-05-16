@@ -11,6 +11,7 @@ YourNews is a personalized news recommendation backend focused on a data pipelin
 - Docker Compose
 - pytest
 - feedparser
+- httpx
 
 ## Quick start
 1. Copy environment file:
@@ -41,7 +42,7 @@ pytest
 ```
 
 ## Current scope
-Implemented backend skeleton, schema foundation, MVP RSS ingestion, topic classification, feedback-driven personalization, digest preview, and a minimal static frontend dashboard. Hacker News ingestion, AI summaries, authentication, and deployment are not implemented yet.
+Implemented backend skeleton, schema foundation, MVP RSS ingestion, Hacker News ingestion, topic classification, feedback-driven personalization, digest preview, and a minimal static frontend dashboard. AI summaries, authentication, and deployment are not implemented yet.
 
 
 ## MVP dashboard
@@ -80,6 +81,26 @@ After the script prints the demo user id, inspect these endpoints:
 - `http://localhost:8000/users`
 - `http://localhost:8000/users/{user_id}/preferences`
 - `http://localhost:8000/digest/preview?user_id={user_id}`
+
+## Hacker News ingestion
+YourNews can ingest Hacker News `top`, `new`, or `best` stories through the public Hacker News Firebase API. HN payloads are normalized into the same article ingestion shape used by RSS feeds, then stored through the shared database insertion path so URL deduplication and `ArticleSource` behavior remain consistent.
+
+Run Hacker News ingestion locally after applying migrations:
+
+```bash
+python -m app.ingestion.run_hn --type top --limit 30
+```
+
+Valid `--type` values are `top`, `new`, and `best`. The command creates or reuses a Hacker News article source with `source_type="hacker_news"`; inserted articles can then be classified and will appear in `GET /articles` and `GET /digest/preview` like RSS articles.
+
+To include Hacker News in the demo-style workflow, run HN ingestion before topic classification or before rerunning the demo inspection endpoints:
+
+```bash
+docker compose exec app python -m app.ingestion.run_hn --type top --limit 30
+docker compose exec app python -m app.classification.run_topics
+```
+
+The existing demo script still seeds and ingests the default RSS sources; HN ingestion is an additional source-type command that can be run before opening `/articles` or `/digest/preview`.
 
 ## Manual personalization test
 Use this flow when you want to manually verify feedback-driven personalization without running the demo script again. The examples use `curl.exe` syntax that works in Windows PowerShell; replace `{user_id}`, `{interesting_article_id}`, and `{not_interesting_article_id}` with values from your local data.
