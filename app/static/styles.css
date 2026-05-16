@@ -135,6 +135,7 @@ h2 {
 }
 
 .inline-form,
+.button-row,
 .section-title-row {
   align-items: center;
   display: flex;
@@ -233,6 +234,7 @@ h2 {
   .site-header,
   .article-item,
   .inline-form,
+  .button-row,
   .section-title-row {
     align-items: stretch;
     flex-direction: column;

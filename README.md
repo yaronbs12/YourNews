@@ -112,6 +112,27 @@ docker compose exec app python -m app.classification.run_topics
 
 The existing demo script still seeds and ingests the default RSS sources; HN ingestion is an additional source-type command that can be run before opening `/articles` or `/digest/preview`.
 
+## Persisted digest workflow
+`GET /digest/preview` remains a read-only way to inspect the current Ranking v2 order without writing rows. To save a digest for later review, generate a persisted digest for a user:
+
+```bash
+curl.exe -X POST "http://127.0.0.1:8000/digests/generate?user_id={user_id}&limit=10"
+```
+
+The generate endpoint validates the user, reuses the same Ranking v2 service as preview, creates one `Digest` row, and stores ordered `DigestItem` rows with article ids and ranks. It returns the saved digest with ordered article details:
+
+```bash
+curl.exe "http://127.0.0.1:8000/digests/{digest_id}"
+```
+
+List saved digests for a user with:
+
+```bash
+curl.exe "http://127.0.0.1:8000/users/{user_id}/digests"
+```
+
+If there are no ranked articles, generation returns an error instead of creating an empty digest.
+
 ## Manual personalization test
 Use this flow when you want to manually verify feedback-driven personalization without running the demo script again. The examples use `curl.exe` syntax that works in Windows PowerShell; replace `{user_id}`, `{interesting_article_id}`, and `{not_interesting_article_id}` with values from your local data.
 

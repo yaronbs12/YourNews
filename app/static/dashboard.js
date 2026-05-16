@@ -8,7 +8,10 @@ const elements = {
   selectedUserId: document.querySelector("#selected-user-id"),
   userStatus: document.querySelector("#user-status"),
   loadDigestButton: document.querySelector("#load-digest-button"),
+  generateDigestButton: document.querySelector("#generate-digest-button"),
   digestList: document.querySelector("#digest-list"),
+  loadSavedDigestsButton: document.querySelector("#load-saved-digests-button"),
+  savedDigestsList: document.querySelector("#saved-digests-list"),
   loadPreferencesButton: document.querySelector("#load-preferences-button"),
   preferencesList: document.querySelector("#preferences-list"),
   loadArticlesButton: document.querySelector("#load-articles-button"),
@@ -154,6 +157,27 @@ function renderPreferences(preferences) {
   });
 }
 
+function renderSavedDigests(digests) {
+  elements.savedDigestsList.classList.remove("empty");
+  elements.savedDigestsList.replaceChildren();
+
+  if (!digests || digests.length === 0) {
+    elements.savedDigestsList.classList.add("empty");
+    elements.savedDigestsList.textContent = "No saved digests yet.";
+    return;
+  }
+
+  digests.forEach((digest) => {
+    const row = document.createElement("div");
+    row.className = "preference-item";
+    row.innerHTML = `<strong></strong><span></span>`;
+    row.querySelector("strong").textContent = `digest_id: ${digest.id}`;
+    const createdAt = new Date(digest.created_at).toLocaleString();
+    row.querySelector("span").textContent = `${digest.item_count} items · ${createdAt}`;
+    elements.savedDigestsList.append(row);
+  });
+}
+
 async function createUser() {
   const email = elements.emailInput.value.trim();
   if (!email) {
@@ -169,7 +193,7 @@ async function createUser() {
     });
     setSelectedUser(user.id);
     setStatus(`Selected ${user.email}.`);
-    await Promise.all([loadPreferences(), loadDigest()]);
+    await Promise.all([loadPreferences(), loadDigest(), loadSavedDigests()]);
   } catch (error) {
     setStatus(`User request failed: ${error.message}`);
   }
@@ -184,6 +208,32 @@ async function loadDigest() {
   } catch (error) {
     elements.digestList.classList.add("empty");
     elements.digestList.textContent = `Digest failed: ${error.message}`;
+  }
+}
+
+async function generateSavedDigest() {
+  if (!requireUser()) return;
+  try {
+    setStatus("Generating saved digest...");
+    const digest = await apiFetch(`/digests/generate?user_id=${encodeURIComponent(state.userId)}&limit=10`, {
+      method: "POST",
+    });
+    setStatus(`Generated digest ${digest.id} with ${digest.items.length} items.`);
+    await loadSavedDigests();
+  } catch (error) {
+    setStatus(`Generate digest failed: ${error.message}`);
+  }
+}
+
+async function loadSavedDigests() {
+  if (!requireUser()) return;
+  try {
+    elements.savedDigestsList.textContent = "Loading saved digests...";
+    const digests = await apiFetch(`/users/${encodeURIComponent(state.userId)}/digests`);
+    renderSavedDigests(digests);
+  } catch (error) {
+    elements.savedDigestsList.classList.add("empty");
+    elements.savedDigestsList.textContent = `Saved digests failed: ${error.message}`;
   }
 }
 
@@ -227,6 +277,8 @@ async function loadArticles() {
 
 elements.createUserButton.addEventListener("click", createUser);
 elements.loadDigestButton.addEventListener("click", loadDigest);
+elements.generateDigestButton.addEventListener("click", generateSavedDigest);
+elements.loadSavedDigestsButton.addEventListener("click", loadSavedDigests);
 elements.loadPreferencesButton.addEventListener("click", loadPreferences);
 elements.loadArticlesButton.addEventListener("click", loadArticles);
 elements.emailInput.addEventListener("keydown", (event) => {

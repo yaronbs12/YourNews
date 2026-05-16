@@ -30,10 +30,22 @@
       <section class="card" aria-labelledby="digest-heading">
         <div class="section-title-row">
           <h2 id="digest-heading">Personalized digest</h2>
-          <button id="load-digest-button" type="button">Load digest</button>
+          <div class="button-row">
+            <button id="load-digest-button" type="button">Load digest</button>
+            <button id="generate-digest-button" type="button" class="secondary">Generate saved digest</button>
+          </div>
         </div>
         <p class="hint">Loads <code>/digest/preview?user_id={user_id}</code>. Use the feedback buttons to tune preferences.</p>
         <div id="digest-list" class="article-list empty">Create/select a user, then load a digest.</div>
+      </section>
+
+      <section class="card" aria-labelledby="saved-digests-heading">
+        <div class="section-title-row">
+          <h2 id="saved-digests-heading">Saved digests</h2>
+          <button id="load-saved-digests-button" type="button">Load saved</button>
+        </div>
+        <p class="hint">Loads <code>/users/{user_id}/digests</code>. Generate a saved digest from the current Ranking v2 order.</p>
+        <div id="saved-digests-list" class="preferences-list empty">No saved digests loaded.</div>
       </section>
 
       <section class="card" aria-labelledby="preferences-heading">
