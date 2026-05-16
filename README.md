@@ -1,39 +1,213 @@
 # YourNews
 
-YourNews is a personalized news recommendation backend focused on a data pipeline and feedback-driven personalization.
+YourNews is a feedback-based personalized news recommendation backend. It ingests articles from RSS feeds and Hacker News, normalizes and deduplicates them, classifies topics, ranks stories for each user, and can persist generated digests for later review.
 
-## Stack
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Alembic
-- Pydantic Settings
-- Docker Compose
-- pytest
-- feedparser
-- httpx
+The project is intentionally backend-focused: it demonstrates a production-style data pipeline, API design, persistence, recommendation logic, and automated tests without adding unrelated product scope such as authentication, AI summaries, or deployment infrastructure.
 
-## Quick start
-1. Copy environment file:
-   ```bash
-   cp .env.example .env
-   ```
-2. Start services:
-   ```bash
-   docker compose up --build
-   ```
-3. Health check:
-   - `GET http://localhost:8000/health`
-4. Open the MVP dashboard:
-   - `http://127.0.0.1:8000/`
+## Problem solved
 
-## Migrations
-Run migrations in app container:
+Most news readers either show the same feed to everyone or require a complex machine-learning stack before personalization is useful. YourNews keeps the MVP practical:
+
+- Collect articles from multiple source types.
+- Normalize them into one database model.
+- Classify each article into simple topics.
+- Let user feedback adjust topic preferences.
+- Generate transparent, explainable digest rankings.
+- Persist generated digests so a daily pipeline can produce reviewable output.
+
+## Architecture overview
+
+```mermaid
+flowchart LR
+    RSS[RSS feeds] --> ING[Ingestion services]
+    HN[Hacker News Firebase API] --> ING
+    ING --> DB[(PostgreSQL)]
+    DB --> CLS[Topic classification]
+    CLS --> DB
+    DB --> RANK[Ranking v2]
+    PREF[User feedback preferences] --> RANK
+    RANK --> DIGEST[Persisted digest]
+    DIGEST --> API[FastAPI endpoints]
+    API --> DASH[Static dashboard]
+    DASH --> FEEDBACK[Feedback actions]
+    FEEDBACK --> PREF
+    FEEDBACK --> DB
+```
+
+At a high level:
+
+1. **Ingestion** fetches RSS and Hacker News stories, normalizes them into a common article shape, and inserts only new URLs.
+2. **Classification** assigns topic labels to unclassified articles using deterministic keyword rules.
+3. **Ranking v2** scores digest candidates with topic, user preference, freshness, and source diversity components.
+4. **Digest generation** persists ranked articles as `Digest` and `DigestItem` rows.
+5. **Feedback** updates user topic preferences, closing the personalization loop.
+
+More detail is available in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Main features
+
+- FastAPI backend with health, article, source, user, feedback, digest preview, and persisted digest endpoints.
+- PostgreSQL data model managed with SQLAlchemy and Alembic.
+- RSS ingestion using seeded RSS sources.
+- Hacker News ingestion from the public Firebase API (`top`, `new`, and `best` stories).
+- URL normalization and database-level deduplication.
+- Topic classification for article ranking and user preferences.
+- Feedback loop with `INTERESTING`, `NEUTRAL`, and `NOT_INTERESTING` labels.
+- Ranking v2 with explainable score breakdowns:
+  - topic score
+  - user preference score
+  - freshness score
+  - source diversity penalty
+- Persisted digest workflow using existing `Digest` and `DigestItem` models.
+- Daily pipeline runner for ingestion → classification → digest generation.
+- Minimal static dashboard served by FastAPI at `/`.
+- Deterministic pytest coverage for ingestion, classification, ranking, feedback, digests, APIs, and CLI runners.
+
+## Tech stack
+
+- **Python**
+- **FastAPI**
+- **PostgreSQL**
+- **SQLAlchemy**
+- **Alembic**
+- **Pydantic Settings**
+- **Docker Compose**
+- **pytest**
+- **feedparser** for RSS parsing
+- **httpx** for Hacker News API calls
+- **Static HTML/CSS/JavaScript** for the dashboard
+
+## Quick start with Docker
+
+From a fresh clone:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+In another terminal, apply migrations:
+
 ```bash
 docker compose exec app alembic upgrade head
 ```
 
-## Local test run
+Open:
+
+```text
+http://127.0.0.1:8000/
+```
+
+Check service health:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+## Demo workflow
+
+This sequence starts from a fresh clone and creates a working local demo with seeded sources, ingested articles, classified topics, sample feedback, and personalized digest output.
+
+```bash
+cp .env.example .env
+docker compose up --build
+docker compose exec app alembic upgrade head
+docker compose exec app python -m app.demo.run_demo
+```
+
+The demo script creates or reuses `demo@yournews.local`, seeds default RSS sources, ingests enabled RSS feeds, classifies unclassified articles, submits sample feedback when possible, and prints the demo user's preferences and top digest items.
+
+Useful local URLs after the demo:
+
+- Dashboard: `http://127.0.0.1:8000/`
+- OpenAPI docs: `http://127.0.0.1:8000/docs`
+- Articles: `http://127.0.0.1:8000/articles?limit=10`
+- Sources: `http://127.0.0.1:8000/sources`
+- Digest preview: `http://127.0.0.1:8000/digest/preview?user_id={user_id}`
+
+## Daily pipeline command
+
+Run the full MVP pipeline with one command after migrations:
+
+```bash
+docker compose exec app python -m app.pipeline.run_daily_digest --limit-per-user 10 --hn-limit 30
+```
+
+The daily pipeline:
+
+1. Ingests enabled RSS sources.
+2. Ingests Hacker News top stories.
+3. Classifies unclassified articles.
+4. Generates persisted digests for existing users.
+5. Skips users when no digest can be generated.
+6. Prints counts for processed sources, inserted articles, classified articles, processed users, created digests, and skipped users.
+
+## API examples
+
+Create or reuse a user:
+
+```bash
+curl -X POST http://127.0.0.1:8000/users \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo@yournews.local"}'
+```
+
+List recent articles:
+
+```bash
+curl "http://127.0.0.1:8000/articles?limit=10"
+```
+
+Preview a personalized digest without persisting it:
+
+```bash
+curl "http://127.0.0.1:8000/digest/preview?user_id={user_id}&limit=10"
+```
+
+Generate and persist a digest:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/digests/generate?user_id={user_id}&limit=10"
+```
+
+Read a persisted digest:
+
+```bash
+curl "http://127.0.0.1:8000/digests/{digest_id}"
+```
+
+List a user's saved digests:
+
+```bash
+curl "http://127.0.0.1:8000/users/{user_id}/digests"
+```
+
+Submit feedback:
+
+```bash
+curl -X POST http://127.0.0.1:8000/feedback \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":1,"article_id":1,"label":"INTERESTING"}'
+```
+
+More endpoint examples are available in [`docs/API_EXAMPLES.md`](docs/API_EXAMPLES.md).
+
+## Dashboard usage
+
+The dashboard is a minimal static interface served by FastAPI. It is designed for local inspection rather than as a production frontend.
+
+Basic flow:
+
+1. Open `http://127.0.0.1:8000/`.
+2. Create or reuse a user by email.
+3. Load a digest preview and inspect topics plus Ranking v2 score breakdowns.
+4. Submit feedback on digest items.
+5. Reload preferences to see topic weights change.
+6. Generate a saved digest and list saved digests.
+7. Load recent articles to inspect ingested content.
+
+## Local development without Docker
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -41,143 +215,44 @@ pip install -r requirements.txt
 pytest
 ```
 
-## Current scope
-Implemented backend skeleton, schema foundation, MVP RSS ingestion, Hacker News ingestion, topic classification, feedback-driven personalization, digest preview, and a minimal static frontend dashboard. AI summaries, authentication, and deployment are not implemented yet.
+For the API outside Docker, set `DATABASE_URL` to a reachable PostgreSQL database and run migrations before starting Uvicorn.
 
+## Testing
 
-## MVP dashboard
-Open the dashboard after starting the FastAPI app:
-
-```text
-http://127.0.0.1:8000/
-```
-
-Basic dashboard flow:
-
-1. Enter an email address and click **Create / reuse user**. The dashboard calls `POST /users` and shows the selected `user_id`.
-2. Click **Load digest** to fetch `GET /digest/preview?user_id={user_id}` and inspect ranked articles with title, source, topics, and `article_id`.
-3. Click **Interesting**, **Neutral**, or **Not interesting** on digest items to send `POST /feedback`.
-4. Click **Reload preferences** to refresh `GET /users/{user_id}/preferences` and inspect topic weights.
-5. Reload the digest to see how feedback-adjusted preferences affect ranking.
-6. Use **Load recent** to inspect `GET /articles?limit=20`.
-
-The dashboard is intentionally MVP-simple: static HTML/CSS/JavaScript served by FastAPI, with no build step, authentication, or external JavaScript dependencies.
-
-## Demo workflow
-Run this workflow to exercise the MVP end-to-end with seeded RSS sources, ingestion, topic classification, feedback-driven preferences, and personalized digest ranking.
+Run the full test suite:
 
 ```bash
-docker compose up --build
-docker compose exec app alembic upgrade head
-docker compose exec app python -m app.demo.run_demo
+pytest
 ```
 
-The demo script creates or reuses `demo@yournews.local`, seeds default RSS sources, ingests enabled RSS feeds, classifies unclassified articles, submits sample positive/negative feedback when candidate articles are available, and prints the demo user's current preferences plus the top 5 personalized digest items. It is safe to run repeatedly: it does not delete data, though feedback and preference weights may accumulate between runs.
-
-After the script prints the demo user id, inspect these endpoints:
-
-- `http://localhost:8000/sources`
-- `http://localhost:8000/articles?limit=10`
-- `http://localhost:8000/users`
-- `http://localhost:8000/users/{user_id}/preferences`
-- `http://localhost:8000/digest/preview?user_id={user_id}`
-
-## Ranking v2 explainability
-Digest preview ranking uses a simple deterministic MVP score so each recommendation can explain why it appeared. Every ranked article gets a score breakdown with:
-
-- `topic_score`: the base score from classified article topics such as `ai`, `tech`, or `business`.
-- `preference_score`: the user's accumulated feedback preference weights for matching topics.
-- `freshness_score`: a small boost for newer articles using `published_at` when available, otherwise `created_at`.
-- `source_penalty`: a small diversity penalty applied when earlier digest items already came from the same source.
-
-`GET /digest/preview` returns both the total score and this breakdown for each item, and the dashboard displays the components next to digest articles so it is clear why each article was ranked.
-
-## Hacker News ingestion
-YourNews can ingest Hacker News `top`, `new`, or `best` stories through the public Hacker News Firebase API. HN payloads are normalized into the same article ingestion shape used by RSS feeds, then stored through the shared database insertion path so URL deduplication and `ArticleSource` behavior remain consistent.
-
-Run Hacker News ingestion locally after applying migrations:
+Run a syntax/bytecode check for the application package:
 
 ```bash
-python -m app.ingestion.run_hn --type top --limit 30
+python -m compileall app
 ```
 
-Valid `--type` values are `top`, `new`, and `best`. The command creates or reuses a Hacker News article source with `source_type="hacker_news"`; inserted articles can then be classified and will appear in `GET /articles` and `GET /digest/preview` like RSS articles.
+## What this project demonstrates
 
-To include Hacker News in the demo-style workflow, run HN ingestion before topic classification or before rerunning the demo inspection endpoints:
+For recruiters and reviewers, YourNews demonstrates practical backend engineering work across:
 
-```bash
-docker compose exec app python -m app.ingestion.run_hn --type top --limit 30
-docker compose exec app python -m app.classification.run_topics
-```
+- **Data ingestion:** RSS and Hacker News source ingestion with deterministic test coverage.
+- **Normalization and deduplication:** shared normalized article shape and URL-based insertion flow.
+- **Recommendation logic:** transparent ranking with topic, preference, freshness, and source diversity components.
+- **Feedback loop:** user feedback updates topic preferences that affect future digest ranking.
+- **Backend APIs:** FastAPI endpoints for users, articles, sources, feedback, digest preview, and persisted digests.
+- **Database modeling:** SQLAlchemy models and Alembic migrations for a relational PostgreSQL schema.
+- **Dockerized local environment:** app and database orchestration through Docker Compose.
+- **Automated tests:** unit and API tests for core services, CLI runners, and endpoint behavior.
 
-The existing demo script still seeds and ingests the default RSS sources; HN ingestion is an additional source-type command that can be run before opening `/articles` or `/digest/preview`.
+## Future improvements
 
-## Persisted digest workflow
-`GET /digest/preview` remains a read-only way to inspect the current Ranking v2 order without writing rows. To save a digest for later review, generate a persisted digest for a user:
+Realistic next steps:
 
-```bash
-curl.exe -X POST "http://127.0.0.1:8000/digests/generate?user_id={user_id}&limit=10"
-```
+- Add scheduled jobs for the daily pipeline.
+- Add email delivery for persisted digests.
+- Improve topic classification with richer rules or a dedicated classifier.
+- Build a more complete frontend while keeping the API-first design.
 
-The generate endpoint validates the user, reuses the same Ranking v2 service as preview, creates one `Digest` row, and stores ordered `DigestItem` rows with article ids and ranks. It returns the saved digest with ordered article details:
+## Current non-goals
 
-```bash
-curl.exe "http://127.0.0.1:8000/digests/{digest_id}"
-```
-
-List saved digests for a user with:
-
-```bash
-curl.exe "http://127.0.0.1:8000/users/{user_id}/digests"
-```
-
-If there are no ranked articles, generation returns an error instead of creating an empty digest.
-
-## Daily pipeline runner
-Run the daily pipeline after migrations when you want one command to execute the full MVP workflow: ingest enabled RSS sources, ingest Hacker News top stories, classify unclassified articles, and generate persisted digests for existing users.
-
-Recommended local Docker workflow:
-
-```bash
-docker compose up --build
-docker compose exec app alembic upgrade head
-docker compose exec app python -m app.pipeline.run_daily_digest --limit-per-user 10 --hn-limit 30
-```
-
-The runner prints a summary with RSS sources processed, inserted RSS/HN article counts, classified article count, users processed, digests created, and users skipped. Users are skipped when no digest can be generated, while unexpected errors still fail the run so they can be investigated.
-
-## Manual personalization test
-Use this flow when you want to manually verify feedback-driven personalization without running the demo script again. The examples use `curl.exe` syntax that works in Windows PowerShell; replace `{user_id}`, `{interesting_article_id}`, and `{not_interesting_article_id}` with values from your local data.
-
-1. Create or reuse a test user:
-   ```powershell
-   curl.exe -X POST http://127.0.0.1:8000/users `
-     -H "Content-Type: application/json" `
-     -d "{\"email\":\"demo@yournews.local\"}"
-   ```
-
-2. Inspect recent articles and choose two different `article_id` values:
-   ```powershell
-   curl.exe "http://127.0.0.1:8000/articles?limit=10"
-   ```
-
-3. Send positive feedback for one article:
-   ```powershell
-   curl.exe -X POST http://127.0.0.1:8000/feedback `
-     -H "Content-Type: application/json" `
-     -d "{\"user_id\":{user_id},\"article_id\":{interesting_article_id},\"label\":\"INTERESTING\"}"
-   ```
-
-4. Send negative feedback for a different article:
-   ```powershell
-   curl.exe -X POST http://127.0.0.1:8000/feedback `
-     -H "Content-Type: application/json" `
-     -d "{\"user_id\":{user_id},\"article_id\":{not_interesting_article_id},\"label\":\"NOT_INTERESTING\"}"
-   ```
-
-5. Inspect the raw feedback rows, accumulated preferences, and personalized digest:
-   ```powershell
-   curl.exe "http://127.0.0.1:8000/feedback?user_id={user_id}"
-   curl.exe "http://127.0.0.1:8000/users/{user_id}/preferences"
-   curl.exe "http://127.0.0.1:8000/digest/preview?user_id={user_id}"
-   ```
+The project intentionally does not include authentication, AI-generated summaries, deployment automation, React, Telegram integration, or real email sending. Those would be reasonable future additions, but the current focus is the backend data and recommendation pipeline.
