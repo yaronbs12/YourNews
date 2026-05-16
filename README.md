@@ -194,16 +194,16 @@ More endpoint examples are available in [`docs/API_EXAMPLES.md`](docs/API_EXAMPL
 
 ## Dashboard usage
 
-The dashboard is a minimal static interface served by FastAPI. It is designed for local inspection rather than as a production frontend.
+The dashboard is a polished, build-free static interface served by FastAPI. It is designed for portfolio-friendly local demos while staying intentionally simple: no React, no frontend build tool, and no external JavaScript dependencies.
 
 Basic flow:
 
 1. Open `http://127.0.0.1:8000/`.
 2. Create or reuse a user by email.
-3. Load a digest preview and inspect topics plus Ranking v2 score breakdowns.
-4. Submit feedback on digest items.
-5. Reload preferences to see topic weights change.
-6. Generate a saved digest and list saved digests.
+3. Load a digest preview and inspect rich digest cards with topics plus Ranking v2 score breakdowns.
+4. Submit feedback with the segmented controls; saved selections are restored when the digest reloads.
+5. Reload preferences to see graphical topic weights change.
+6. Generate a saved digest, list saved digests, and inspect saved digest details.
 7. Load recent articles to inspect ingested content.
 
 ## Local development without Docker
