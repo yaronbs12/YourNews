@@ -429,6 +429,11 @@ h3 {
   white-space: nowrap;
 }
 
+.score-breakdown {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .topics {
   display: flex;
   flex-wrap: wrap;
