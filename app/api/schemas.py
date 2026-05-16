@@ -7,6 +7,7 @@ __all__ = [
     "SourceRead",
     "DigestPreviewItem",
     "DigestPreview",
+    "DigestScoreBreakdown",
     "FeedbackCreate",
     "FeedbackRead",
     "UserCreate",
@@ -35,6 +36,16 @@ class SourceRead(BaseModel):
     last_fetched_at: datetime | None
 
 
+class DigestScoreBreakdown(BaseModel):
+    """Explainable score components for a digest candidate."""
+
+    total_score: int
+    topic_score: int
+    preference_score: int
+    freshness_score: int
+    source_penalty: int
+
+
 class DigestPreviewItem(BaseModel):
     """Single preview row for digest candidates."""
 
@@ -46,6 +57,8 @@ class DigestPreviewItem(BaseModel):
     published_at: datetime | None
     created_at: datetime
     topics: list[str]
+    score: int
+    score_breakdown: DigestScoreBreakdown
 
 
 class DigestPreview(BaseModel):

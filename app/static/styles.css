@@ -189,9 +189,15 @@ h2 {
   text-decoration: underline;
 }
 
-.meta {
+.meta,
+.score-breakdown {
   font-size: 0.9rem;
   margin: 0.2rem 0 0.45rem;
+}
+
+.score-breakdown {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .topics {
