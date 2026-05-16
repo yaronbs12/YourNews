@@ -133,6 +133,19 @@ curl.exe "http://127.0.0.1:8000/users/{user_id}/digests"
 
 If there are no ranked articles, generation returns an error instead of creating an empty digest.
 
+## Daily pipeline runner
+Run the daily pipeline after migrations when you want one command to execute the full MVP workflow: ingest enabled RSS sources, ingest Hacker News top stories, classify unclassified articles, and generate persisted digests for existing users.
+
+Recommended local Docker workflow:
+
+```bash
+docker compose up --build
+docker compose exec app alembic upgrade head
+docker compose exec app python -m app.pipeline.run_daily_digest --limit-per-user 10 --hn-limit 30
+```
+
+The runner prints a summary with RSS sources processed, inserted RSS/HN article counts, classified article count, users processed, digests created, and users skipped. Users are skipped when no digest can be generated, while unexpected errors still fail the run so they can be investigated.
+
 ## Manual personalization test
 Use this flow when you want to manually verify feedback-driven personalization without running the demo script again. The examples use `curl.exe` syntax that works in Windows PowerShell; replace `{user_id}`, `{interesting_article_id}`, and `{not_interesting_article_id}` with values from your local data.
 
