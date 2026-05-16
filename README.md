@@ -82,6 +82,16 @@ After the script prints the demo user id, inspect these endpoints:
 - `http://localhost:8000/users/{user_id}/preferences`
 - `http://localhost:8000/digest/preview?user_id={user_id}`
 
+## Ranking v2 explainability
+Digest preview ranking uses a simple deterministic MVP score so each recommendation can explain why it appeared. Every ranked article gets a score breakdown with:
+
+- `topic_score`: the base score from classified article topics such as `ai`, `tech`, or `business`.
+- `preference_score`: the user's accumulated feedback preference weights for matching topics.
+- `freshness_score`: a small boost for newer articles using `published_at` when available, otherwise `created_at`.
+- `source_penalty`: a small diversity penalty applied when earlier digest items already came from the same source.
+
+`GET /digest/preview` returns both the total score and this breakdown for each item, and the dashboard displays the components next to digest articles so it is clear why each article was ranked.
+
 ## Hacker News ingestion
 YourNews can ingest Hacker News `top`, `new`, or `best` stories through the public Hacker News Firebase API. HN payloads are normalized into the same article ingestion shape used by RSS feeds, then stored through the shared database insertion path so URL deduplication and `ArticleSource` behavior remain consistent.
 

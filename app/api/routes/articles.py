@@ -7,6 +7,7 @@ from app.api.schemas import (
     ArticleRead,
     DigestPreview,
     DigestPreviewItem,
+    DigestScoreBreakdown,
     FeedbackCreate,
     FeedbackRead,
     SourceRead,
@@ -99,6 +100,14 @@ def preview_digest(
             published_at=ranked_article.article.published_at,
             created_at=ranked_article.article.created_at,
             topics=ranked_article.topics,
+            score=ranked_article.score,
+            score_breakdown=DigestScoreBreakdown(
+                total_score=ranked_article.score_breakdown.total_score,
+                topic_score=ranked_article.score_breakdown.topic_score,
+                preference_score=ranked_article.score_breakdown.preference_score,
+                freshness_score=ranked_article.score_breakdown.freshness_score,
+                source_penalty=ranked_article.score_breakdown.source_penalty,
+            ),
         )
         for index, ranked_article in enumerate(ranked_articles, start=1)
     ]

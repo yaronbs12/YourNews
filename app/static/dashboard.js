@@ -74,6 +74,26 @@ function renderTopics(container, topics) {
   });
 }
 
+function renderScoreBreakdown(container, article) {
+  const existing = container.querySelector(".score-breakdown");
+  if (existing) existing.remove();
+
+  if (!article.score_breakdown) return;
+
+  const breakdown = article.score_breakdown;
+  const scoreDetails = document.createElement("div");
+  scoreDetails.className = "score-breakdown";
+  const sourcePenalty = breakdown.source_penalty > 0 ? breakdown.source_penalty : 0;
+  scoreDetails.textContent = [
+    `Total score: ${breakdown.total_score}`,
+    `Topic score: ${breakdown.topic_score}`,
+    `Preference score: ${breakdown.preference_score}`,
+    `Freshness score: ${breakdown.freshness_score}`,
+    `Source penalty: ${sourcePenalty}`,
+  ].join(" · ");
+  container.append(scoreDetails);
+}
+
 function renderArticles(container, articles, { includeFeedback = false } = {}) {
   container.classList.remove("empty");
   container.replaceChildren();
@@ -95,6 +115,7 @@ function renderArticles(container, articles, { includeFeedback = false } = {}) {
     title.href = article.url;
     meta.textContent = `Source: ${article.source_name || "unknown"} · article_id: ${article.article_id || article.id}`;
     renderTopics(topics, article.topics || []);
+    renderScoreBreakdown(node.querySelector(".article-main"), article);
 
     if (includeFeedback) {
       feedbackOptions.forEach((option) => {
