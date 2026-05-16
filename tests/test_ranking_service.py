@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.base import Base
 from app.models import *  # noqa: F403,F401
@@ -15,142 +14,162 @@ from app.models.user import User
 from app.models.user_preference import UserPreference
 from app.ranking.service import RankingUserNotFoundError, rank_articles_for_digest
 
-
-def _add_topic(session, article: Article, name: str, score: int = 1) -> None:
-    topic = session.query(Topic).filter_by(name=name).one_or_none()
-    if topic is None:
-        topic = Topic(name=name)
-        session.add(topic)
-        session.flush()
-    session.add(ArticleTopic(article_id=article.id, topic_id=topic.id, relevance_score=score))
+NOW = datetime(2026, 5, 7, tzinfo=timezone.utc)
 
 
-def test_rank_articles_for_digest_prefers_weighted_topics_over_general() -> None:
+def _sessionmaker() -> sessionmaker:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    now = datetime(2026, 5, 7, tzinfo=timezone.utc)
+    return sessionmaker(bind=engine)
 
+
+def _add_source(session: Session, name: str = "Source") -> ArticleSource:
+    source = ArticleSource(
+        name=name,
+        url=f"https://example.com/{name.lower().replace(' ', '-')}/rss",
+        source_type="rss",
+        enabled=True,
+    )
+    session.add(source)
+    session.flush()
+    return source
+
+
+def _add_article(
+    session: Session,
+    source: ArticleSource,
+    title: str,
+    created_at: datetime,
+    topics: list[str],
+    published_at: datetime | None = None,
+) -> Article:
+    article = Article(
+        source_id=source.id,
+        title=title,
+        url=f"https://example.com/{title.lower().replace(' ', '-')}",
+        content=None,
+        published_at=published_at,
+        created_at=created_at,
+    )
+    session.add(article)
+    session.flush()
+    for name in topics:
+        topic = session.query(Topic).filter_by(name=name).one_or_none()
+        if topic is None:
+            topic = Topic(name=name)
+            session.add(topic)
+            session.flush()
+        session.add(ArticleTopic(article_id=article.id, topic_id=topic.id, relevance_score=1))
+    return article
+
+
+def _add_user(session: Session, email: str = "reader@example.com") -> User:
+    user = User(email=email)
+    session.add(user)
+    session.flush()
+    return user
+
+
+def _set_preference(session: Session, user: User, topic_name: str, weight: int) -> None:
+    topic = session.query(Topic).filter_by(name=topic_name).one()
+    session.add(UserPreference(user_id=user.id, topic_id=topic.id, weight=weight))
+
+
+def test_rank_articles_for_digest_without_user_has_score_breakdown() -> None:
+    SessionLocal = _sessionmaker()
     with SessionLocal() as session:
-        source = ArticleSource(name="Source", url="https://example.com/rss", source_type="rss", enabled=True)
-        session.add(source)
-        session.flush()
-        general = Article(source_id=source.id, title="Newest general", url="https://example.com/general", content=None, published_at=None, created_at=now)
-        ai = Article(source_id=source.id, title="Older AI", url="https://example.com/ai", content=None, published_at=None, created_at=now - timedelta(days=1))
-        tech = Article(source_id=source.id, title="Older tech", url="https://example.com/tech", content=None, published_at=None, created_at=now - timedelta(days=2))
-        session.add_all([general, ai, tech])
-        session.flush()
-        _add_topic(session, general, "general")
-        _add_topic(session, ai, "ai")
-        _add_topic(session, tech, "tech")
+        source = _add_source(session)
+        _add_article(session, source, "Newest General", NOW, ["general"])
+        _add_article(session, source, "Older AI", NOW - timedelta(days=1), ["ai"])
+        _add_article(session, source, "Older Tech", NOW - timedelta(days=2), ["tech"])
         session.commit()
 
         ranked = rank_articles_for_digest(session, limit=3)
 
-        assert [item.article.title for item in ranked] == ["Older AI", "Older tech", "Newest general"]
-        assert [item.score for item in ranked] == [3, 2, 0]
+        assert [item.article.title for item in ranked] == ["Older AI", "Older Tech", "Newest General"]
+        assert ranked[0].score_breakdown.topic_score == 3
+        assert ranked[0].score_breakdown.preference_score == 0
+        assert ranked[0].score_breakdown.freshness_score == 2
+        assert ranked[0].score_breakdown.source_penalty == 0
+        assert ranked[0].score == 5
+        assert ranked[1].score_breakdown.source_penalty == 1
 
 
-def test_rank_articles_for_digest_uses_created_at_desc_as_tiebreaker() -> None:
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    now = datetime(2026, 5, 7, tzinfo=timezone.utc)
-
+def test_rank_articles_for_digest_with_user_preferences_splits_scores() -> None:
+    SessionLocal = _sessionmaker()
     with SessionLocal() as session:
-        source = ArticleSource(name="Source", url="https://example.com/tie-rss", source_type="rss", enabled=True)
-        session.add(source)
-        session.flush()
-        older = Article(source_id=source.id, title="Older AI", url="https://example.com/tie-older", content=None, published_at=None, created_at=now - timedelta(hours=1))
-        newer = Article(source_id=source.id, title="Newer AI", url="https://example.com/tie-newer", content=None, published_at=None, created_at=now)
-        session.add_all([older, newer])
-        session.flush()
-        _add_topic(session, older, "ai")
-        _add_topic(session, newer, "ai")
+        source = _add_source(session)
+        _add_article(session, source, "Static Winner AI", NOW, ["ai"])
+        _add_article(session, source, "Preferred Business", NOW - timedelta(hours=1), ["business"])
+        user = _add_user(session, "positive-ranking@example.com")
+        _set_preference(session, user, "business", 5)
+        session.commit()
+
+        ranked = rank_articles_for_digest(session, limit=2, user_id=user.id)
+
+        assert [item.article.title for item in ranked] == ["Preferred Business", "Static Winner AI"]
+        assert ranked[0].score_breakdown.topic_score == 1
+        assert ranked[0].score_breakdown.preference_score == 5
+        assert ranked[0].score_breakdown.freshness_score == 2
+        assert ranked[0].score == 8
+
+
+def test_rank_articles_for_digest_freshness_boosts_newer_articles() -> None:
+    SessionLocal = _sessionmaker()
+    with SessionLocal() as session:
+        source = _add_source(session)
+        _add_article(session, source, "Old Tech", NOW - timedelta(days=8), ["tech"])
+        _add_article(session, source, "Fresh Tech", NOW, ["tech"])
         session.commit()
 
         ranked = rank_articles_for_digest(session, limit=2)
 
-        assert [item.article.title for item in ranked] == ["Newer AI", "Older AI"]
+        assert [item.article.title for item in ranked] == ["Fresh Tech", "Old Tech"]
+        assert ranked[0].score_breakdown.freshness_score == 2
+        assert ranked[1].score_breakdown.freshness_score == 0
 
 
-def test_rank_articles_for_digest_boosts_positive_user_preferences() -> None:
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    now = datetime(2026, 5, 7, tzinfo=timezone.utc)
-
+def test_rank_articles_for_digest_uses_published_at_for_freshness_when_available() -> None:
+    SessionLocal = _sessionmaker()
     with SessionLocal() as session:
-        source = ArticleSource(name="Source", url="https://example.com/personal-rss", source_type="rss", enabled=True)
-        session.add(source)
-        session.flush()
-        ai = Article(source_id=source.id, title="AI", url="https://example.com/p-ai", content=None, published_at=None, created_at=now)
-        business = Article(
-            source_id=source.id,
-            title="Business",
-            url="https://example.com/p-business",
-            content=None,
-            published_at=None,
-            created_at=now - timedelta(hours=1),
+        source = _add_source(session)
+        _add_article(
+            session,
+            source,
+            "Created New But Published Old",
+            NOW,
+            ["tech"],
+            published_at=NOW - timedelta(days=8),
         )
-        session.add_all([ai, business])
-        session.flush()
-        _add_topic(session, ai, "ai")
-        _add_topic(session, business, "business")
-        user = User(email="positive@example.com")
-        session.add(user)
-        session.flush()
-        business_topic = session.query(Topic).filter_by(name="business").one()
-        session.add(UserPreference(user_id=user.id, topic_id=business_topic.id, weight=5))
+        _add_article(session, source, "Published New", NOW - timedelta(days=8), ["tech"], published_at=NOW)
         session.commit()
 
-        ranked = rank_articles_for_digest(session, limit=2, user_id=user.id)
+        ranked = rank_articles_for_digest(session, limit=2)
 
-        assert [item.article.title for item in ranked] == ["Business", "AI"]
-        assert [item.score for item in ranked] == [6, 3]
+        assert ranked[0].article.title == "Published New"
+        assert ranked[0].score_breakdown.freshness_score == 2
+        assert ranked[1].score_breakdown.freshness_score == 0
 
 
-def test_rank_articles_for_digest_lowers_negative_user_preferences() -> None:
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    now = datetime(2026, 5, 7, tzinfo=timezone.utc)
-
+def test_rank_articles_for_digest_applies_source_diversity_penalty() -> None:
+    SessionLocal = _sessionmaker()
     with SessionLocal() as session:
-        source = ArticleSource(name="Source", url="https://example.com/negative-rss", source_type="rss", enabled=True)
-        session.add(source)
-        session.flush()
-        ai = Article(source_id=source.id, title="AI", url="https://example.com/n-ai", content=None, published_at=None, created_at=now)
-        tech = Article(
-            source_id=source.id,
-            title="Tech",
-            url="https://example.com/n-tech",
-            content=None,
-            published_at=None,
-            created_at=now - timedelta(hours=1),
-        )
-        session.add_all([ai, tech])
-        session.flush()
-        _add_topic(session, ai, "ai")
-        _add_topic(session, tech, "tech")
-        user = User(email="negative@example.com")
-        session.add(user)
-        session.flush()
-        ai_topic = session.query(Topic).filter_by(name="ai").one()
-        session.add(UserPreference(user_id=user.id, topic_id=ai_topic.id, weight=-4))
+        source_a = _add_source(session, "Source A")
+        source_b = _add_source(session, "Source B")
+        _add_article(session, source_a, "Best A", NOW, ["ai"])
+        _add_article(session, source_a, "Second A", NOW - timedelta(minutes=2), ["ai"])
+        _add_article(session, source_b, "Best B", NOW - timedelta(minutes=1), ["tech"])
         session.commit()
 
-        ranked = rank_articles_for_digest(session, limit=2, user_id=user.id)
+        ranked = rank_articles_for_digest(session, limit=3)
 
-        assert [item.article.title for item in ranked] == ["Tech", "AI"]
-        assert [item.score for item in ranked] == [2, -1]
+        assert [item.article.title for item in ranked] == ["Best A", "Best B", "Second A"]
+        assert ranked[1].score_breakdown.source_penalty == 0
+        assert ranked[2].score_breakdown.source_penalty == 1
 
 
 def test_rank_articles_for_digest_unknown_user_raises_clear_error() -> None:
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-
+    SessionLocal = _sessionmaker()
     with SessionLocal() as session:
         with pytest.raises(RankingUserNotFoundError, match="User not found"):
             rank_articles_for_digest(session, user_id=999)
