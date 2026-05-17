@@ -14,9 +14,7 @@ from app.models.user_preference import UserPreference
 TOPIC_SCORE_WEIGHTS: dict[str, int] = {
     "ai": 3,
     "technology": 2,
-    "tech": 2,
     "cybersecurity": 2,
-    "security": 2,
     "sports": 2,
     "football": 2,
     "basketball": 2,

@@ -16,7 +16,7 @@ from app.models.user_preference import UserPreference
 from app.ranking.service import rank_articles_for_digest
 
 DEMO_EMAIL = "demo@yournews.local"
-PREFERRED_POSITIVE_TOPICS = ["ai", "tech", "security"]
+PREFERRED_POSITIVE_TOPICS = ["ai", "technology", "cybersecurity"]
 
 
 @dataclass(frozen=True)

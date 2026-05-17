@@ -12,7 +12,7 @@ from app.models.associations import ArticleTopic
 from app.models.topic import Topic
 from app.models.user import User
 from app.models.user_preference import UserPreference
-from app.ranking.service import RankingUserNotFoundError, rank_articles_for_digest
+from app.ranking.service import TOPIC_SCORE_WEIGHTS, RankingUserNotFoundError, rank_articles_for_digest
 
 NOW = datetime(2026, 5, 7, tzinfo=timezone.utc)
 
@@ -75,13 +75,40 @@ def _set_preference(session: Session, user: User, topic_name: str, weight: int) 
     session.add(UserPreference(user_id=user.id, topic_id=topic.id, weight=weight))
 
 
+def test_topic_score_weights_use_canonical_taxonomy() -> None:
+    assert TOPIC_SCORE_WEIGHTS == {
+        "ai": 3,
+        "technology": 2,
+        "cybersecurity": 2,
+        "sports": 2,
+        "football": 2,
+        "basketball": 2,
+        "tennis": 2,
+        "politics": 2,
+        "world": 2,
+        "israel": 2,
+        "business": 1,
+        "finance": 1,
+        "startups": 1,
+        "science": 1,
+        "health": 1,
+        "culture": 1,
+        "entertainment": 1,
+        "gaming": 1,
+        "climate": 1,
+        "general": 0,
+    }
+    assert "tech" not in TOPIC_SCORE_WEIGHTS
+    assert "security" not in TOPIC_SCORE_WEIGHTS
+
+
 def test_rank_articles_for_digest_without_user_has_score_breakdown() -> None:
     SessionLocal = _sessionmaker()
     with SessionLocal() as session:
         source = _add_source(session)
         _add_article(session, source, "Newest General", NOW, ["general"])
         _add_article(session, source, "Older AI", NOW - timedelta(days=1), ["ai"])
-        _add_article(session, source, "Older Tech", NOW - timedelta(days=2), ["tech"])
+        _add_article(session, source, "Older Tech", NOW - timedelta(days=2), ["technology"])
         session.commit()
 
         ranked = rank_articles_for_digest(session, limit=3)
@@ -118,8 +145,8 @@ def test_rank_articles_for_digest_freshness_boosts_newer_articles() -> None:
     SessionLocal = _sessionmaker()
     with SessionLocal() as session:
         source = _add_source(session)
-        _add_article(session, source, "Old Tech", NOW - timedelta(days=8), ["tech"])
-        _add_article(session, source, "Fresh Tech", NOW, ["tech"])
+        _add_article(session, source, "Old Tech", NOW - timedelta(days=8), ["technology"])
+        _add_article(session, source, "Fresh Tech", NOW, ["technology"])
         session.commit()
 
         ranked = rank_articles_for_digest(session, limit=2)
@@ -138,10 +165,10 @@ def test_rank_articles_for_digest_uses_published_at_for_freshness_when_available
             source,
             "Created New But Published Old",
             NOW,
-            ["tech"],
+            ["technology"],
             published_at=NOW - timedelta(days=8),
         )
-        _add_article(session, source, "Published New", NOW - timedelta(days=8), ["tech"], published_at=NOW)
+        _add_article(session, source, "Published New", NOW - timedelta(days=8), ["technology"], published_at=NOW)
         session.commit()
 
         ranked = rank_articles_for_digest(session, limit=2)
@@ -158,7 +185,7 @@ def test_rank_articles_for_digest_applies_source_diversity_penalty() -> None:
         source_b = _add_source(session, "Source B")
         _add_article(session, source_a, "Best A", NOW, ["ai"])
         _add_article(session, source_a, "Second A", NOW - timedelta(minutes=2), ["ai"])
-        _add_article(session, source_b, "Best B", NOW - timedelta(minutes=1), ["tech"])
+        _add_article(session, source_b, "Best B", NOW - timedelta(minutes=1), ["technology"])
         session.commit()
 
         ranked = rank_articles_for_digest(session, limit=3)

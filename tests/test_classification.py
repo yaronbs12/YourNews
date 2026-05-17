@@ -20,8 +20,8 @@ def test_classify_article_text_detects_all_topics_case_insensitively() -> None:
     )
 
     assert "ai" in text_topics
-    assert "tech" in text_topics
-    assert "security" in text_topics
+    assert "technology" in text_topics
+    assert "cybersecurity" in text_topics
     assert "business" in text_topics
     assert "world" in text_topics
 
@@ -66,10 +66,10 @@ def test_classify_unclassified_articles_creates_rows_and_skips_already_classifie
         session.add_all([new_a, old_a])
         session.flush()
 
-        security = Topic(name="security")
-        session.add(security)
+        cybersecurity = Topic(name="cybersecurity")
+        session.add(cybersecurity)
         session.flush()
-        session.add(ArticleTopic(article_id=old_a.id, topic_id=security.id, relevance_score=2))
+        session.add(ArticleTopic(article_id=old_a.id, topic_id=cybersecurity.id, relevance_score=2))
         session.commit()
 
         count = classify_unclassified_articles(session)
@@ -162,3 +162,90 @@ def test_classify_article_text_detects_climate_science_article() -> None:
 
     assert "climate" in topics
     assert "science" in topics
+
+
+def test_classify_article_text_uses_canonical_technology_topic_for_aliases() -> None:
+    topics = classify_article_text(
+        "Tech platform API update",
+        "Software developers shipped GitHub database tooling in Python and JavaScript.",
+    )
+
+    assert "technology" in topics
+    assert "tech" not in topics
+
+
+def test_classify_article_text_uses_canonical_cybersecurity_topic_for_aliases() -> None:
+    topics = classify_article_text(
+        "Security team investigates cyber breach",
+        "The hack exposed a vulnerability, phishing campaign, malware, privacy risk, and data leak.",
+    )
+
+    assert "cybersecurity" in topics
+    assert "security" not in topics
+
+
+def test_topic_keyword_taxonomy_uses_only_canonical_topic_keys() -> None:
+    from app.classification.rules import TOPIC_KEYWORDS
+
+    canonical_keyword_topics = {
+        "ai",
+        "technology",
+        "cybersecurity",
+        "business",
+        "finance",
+        "startups",
+        "politics",
+        "world",
+        "israel",
+        "science",
+        "health",
+        "climate",
+        "sports",
+        "football",
+        "basketball",
+        "tennis",
+        "culture",
+        "entertainment",
+        "gaming",
+    }
+    assert set(TOPIC_KEYWORDS) == canonical_keyword_topics
+    assert "tech" not in TOPIC_KEYWORDS
+    assert "security" not in TOPIC_KEYWORDS
+
+
+def test_topic_keyword_aliases_stay_under_canonical_topics() -> None:
+    from app.classification.rules import TOPIC_KEYWORDS
+
+    assert {
+        "tech",
+        "software",
+        "github",
+        "developer",
+        "programming",
+        "app",
+        "cloud",
+        "database",
+        "api",
+        "python",
+        "javascript",
+        "platform",
+        "product",
+        "engineering",
+        "semiconductor",
+        "chip",
+    }.issubset(TOPIC_KEYWORDS["technology"])
+    assert {
+        "security",
+        "cyber",
+        "cybersecurity",
+        "cyber security",
+        "hack",
+        "breach",
+        "vulnerability",
+        "malware",
+        "ransomware",
+        "exploit",
+        "phishing",
+        "privacy",
+        "data leak",
+    }.issubset(TOPIC_KEYWORDS["cybersecurity"])
