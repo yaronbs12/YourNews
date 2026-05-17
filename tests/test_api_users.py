@@ -70,12 +70,12 @@ def test_get_user_preferences_returns_topic_weights_ordered_by_weight_then_topic
         user = User(email="prefs@example.com")
         ai = Topic(name="ai")
         business = Topic(name="business")
-        security = Topic(name="security")
-        session.add_all([user, ai, business, security])
+        cybersecurity = Topic(name="cybersecurity")
+        session.add_all([user, ai, business, cybersecurity])
         session.flush()
         session.add_all(
             [
-                UserPreference(user_id=user.id, topic_id=security.id, weight=-2),
+                UserPreference(user_id=user.id, topic_id=cybersecurity.id, weight=-2),
                 UserPreference(user_id=user.id, topic_id=business.id, weight=4),
                 UserPreference(user_id=user.id, topic_id=ai.id, weight=4),
             ]
@@ -89,7 +89,7 @@ def test_get_user_preferences_returns_topic_weights_ordered_by_weight_then_topic
     assert response.json() == [
         {"topic": "ai", "weight": 4},
         {"topic": "business", "weight": 4},
-        {"topic": "security", "weight": -2},
+        {"topic": "cybersecurity", "weight": -2},
     ]
 
 

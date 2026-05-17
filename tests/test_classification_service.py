@@ -13,11 +13,11 @@ from app.models.topic import Topic
 def test_classify_article_text_detects_topics() -> None:
     topics = classify_article_text(
         "OpenAI startup faces security breach during election season",
-        "The company and government discussed artificial intelligence and cyber vulnerability in the market.",
+        "The software company API and government discussed artificial intelligence and cyber vulnerability in the market.",
     )
     assert "ai" in topics
-    assert "tech" in topics
-    assert "security" in topics
+    assert "technology" in topics
+    assert "cybersecurity" in topics
     assert "business" in topics
     assert "politics" in topics
 
@@ -51,7 +51,7 @@ def test_classify_unclassified_articles_creates_topics_and_links_and_skips_class
         session.add_all([a1, a2, a3])
         session.flush()
 
-        pre_topic = Topic(name="security")
+        pre_topic = Topic(name="cybersecurity")
         session.add(pre_topic)
         session.flush()
         session.add(ArticleTopic(article_id=a3.id, topic_id=pre_topic.id, relevance_score=1))

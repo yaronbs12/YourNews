@@ -34,11 +34,11 @@ def test_get_or_create_demo_user_reuses_existing_user() -> None:
         assert first_user.email == "demo@yournews.local"
 
 
-def test_pick_feedback_candidates_prefers_ai_tech_security_positive() -> None:
+def test_pick_feedback_candidates_prefers_ai_technology_cybersecurity_positive() -> None:
     candidates = [
         run_demo.ArticleCandidate(article_id=1, title="Business", topics=["business"]),
         run_demo.ArticleCandidate(article_id=2, title="AI", topics=["ai"]),
-        run_demo.ArticleCandidate(article_id=3, title="Security", topics=["security"]),
+        run_demo.ArticleCandidate(article_id=3, title="Security", topics=["cybersecurity"]),
     ]
 
     positive, negative = run_demo.pick_feedback_candidates(candidates)

@@ -14,7 +14,9 @@ def test_dashboard_root_serves_index() -> None:
     client = TestClient(app)
     response = client.get("/")
     assert response.status_code == 200
-    assert "YourNews MVP Dashboard" in response.text
+    assert "YourNews Dashboard" in response.text
+    assert "Feedback-driven digest dashboard" in response.text
+    assert "Personalized digest" in response.text
 
 
 def test_dashboard_static_javascript_served() -> None:
