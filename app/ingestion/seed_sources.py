@@ -1,33 +1,58 @@
+from dataclasses import dataclass
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.article_source import ArticleSource
 
-DEFAULT_RSS_SOURCES: list[tuple[str, str]] = [
-    ("Hacker News Front Page", "https://hnrss.org/frontpage"),
-    ("Hacker News Newest", "https://hnrss.org/newest"),
-    ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
-    ("TechCrunch", "https://techcrunch.com/feed/"),
+
+@dataclass(frozen=True)
+class DefaultRssSource:
+    name: str
+    url: str
+    category: str
+
+
+DEFAULT_RSS_SOURCES: list[DefaultRssSource] = [
+    DefaultRssSource("NPR News", "https://feeds.npr.org/1001/rss.xml", "general"),
+    DefaultRssSource("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml", "world"),
+    DefaultRssSource("TechCrunch", "https://techcrunch.com/feed/", "technology"),
+    DefaultRssSource("The Verge", "https://www.theverge.com/rss/index.xml", "technology"),
+    DefaultRssSource("BBC Business", "https://feeds.bbci.co.uk/news/business/rss.xml", "business"),
+    DefaultRssSource("NASA Breaking News", "https://www.nasa.gov/news-release/feed/", "science"),
+    DefaultRssSource("ESPN Top Headlines", "https://www.espn.com/espn/rss/news", "sports"),
+    DefaultRssSource("Hacker News Front Page", "https://hnrss.org/frontpage", "technology"),
+    DefaultRssSource("Hacker News Newest", "https://hnrss.org/newest", "technology"),
 ]
 
 
 def seed_default_rss_sources(session: Session) -> int:
     inserted = 0
     try:
-        for name, url in DEFAULT_RSS_SOURCES:
+        for source_def in DEFAULT_RSS_SOURCES:
             existing = session.scalar(
                 select(ArticleSource).where(
                     or_(
-                        ArticleSource.name == name,
-                        ArticleSource.url == url,
+                        ArticleSource.name == source_def.name,
+                        ArticleSource.url == source_def.url,
                     )
                 )
             )
             if existing is not None:
+                if getattr(existing, "category", None) in (None, "general") and source_def.category != "general":
+                    existing.category = source_def.category
                 continue
 
-            session.add(ArticleSource(name=name, url=url, source_type="rss", enabled=True))
+            session.add(
+                ArticleSource(
+                    name=source_def.name,
+                    url=source_def.url,
+                    source_type="rss",
+                    category=source_def.category,
+                    enabled=True,
+                )
+            )
             inserted += 1
 
         session.commit()

@@ -3,68 +3,124 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>YourNews MVP Dashboard</title>
+    <title>YourNews Dashboard</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <div>
-        <p class="eyebrow">YourNews MVP</p>
-        <h1>Dashboard</h1>
-      </div>
-      <p class="subtitle">Create a demo user, inspect a personalized digest, submit feedback, and watch topic preferences change.</p>
+    <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+
+    <header class="hero-shell">
+      <nav class="top-nav" aria-label="Dashboard header">
+        <div class="brand-mark">
+          <span class="brand-icon">YN</span>
+          <span>YourNews</span>
+        </div>
+        <div class="nav-pill">MVP Recommendation Pipeline</div>
+      </nav>
+
+      <section class="hero-card">
+        <div class="hero-copy">
+          <p class="eyebrow">Personalized news backend</p>
+          <h1>Feedback-driven digest dashboard</h1>
+          <p class="subtitle">
+            Inspect article ingestion, explainable ranking, saved digests, and preference learning from one polished local demo.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#digest-heading">Review digest</a>
+            <a class="button ghost" href="/docs" target="_blank" rel="noreferrer">Open API docs</a>
+          </div>
+        </div>
+        <div class="hero-summary" aria-label="Current dashboard metrics">
+          <div class="metric-card accent">
+            <span class="metric-label">Selected user</span>
+            <strong id="metric-user">None</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Saved digests</span>
+            <strong id="metric-digests">—</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Preferences</span>
+            <strong id="metric-preferences">—</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Recent articles</span>
+            <strong id="metric-articles">—</strong>
+          </div>
+        </div>
+      </section>
     </header>
 
-    <main class="layout">
-      <section class="card user-card" aria-labelledby="user-heading">
-        <h2 id="user-heading">User</h2>
-        <label for="email-input">Email</label>
+    <main class="dashboard-shell">
+      <section class="panel user-panel" aria-labelledby="user-heading">
+        <div class="panel-header">
+          <div>
+            <p class="section-kicker">Reader context</p>
+            <h2 id="user-heading">User</h2>
+          </div>
+          <span class="status-pill" id="selected-user-pill">No user selected</span>
+        </div>
+        <label class="input-label" for="email-input">Email address</label>
         <div class="inline-form">
           <input id="email-input" type="email" value="demo@yournews.local" placeholder="you@example.com" autocomplete="email" />
-          <button id="create-user-button" type="button">Create / reuse user</button>
+          <button id="create-user-button" type="button" class="button primary">Create / reuse user</button>
         </div>
-        <p class="selected-user">Selected user_id: <strong id="selected-user-id">none</strong></p>
-        <p id="user-status" class="status" role="status"></p>
+        <p class="microcopy">Selected user_id: <strong id="selected-user-id">none</strong></p>
+        <p id="user-status" class="sr-only" role="status"></p>
       </section>
 
-      <section class="card" aria-labelledby="digest-heading">
-        <div class="section-title-row">
-          <h2 id="digest-heading">Personalized digest</h2>
-          <button id="load-digest-button" type="button">Load digest</button>
+      <section class="panel digest-panel" aria-labelledby="digest-heading">
+        <div class="panel-header">
+          <div>
+            <p class="section-kicker">Ranking v2</p>
+            <h2 id="digest-heading">Personalized digest</h2>
+          </div>
+          <div class="button-row">
+            <button id="load-digest-button" type="button" class="button primary">Load preview</button>
+            <button id="generate-digest-button" type="button" class="button secondary">Generate saved digest</button>
+          </div>
         </div>
-        <p class="hint">Loads <code>/digest/preview?user_id={user_id}</code>. Use the feedback buttons to tune preferences.</p>
-        <div id="digest-list" class="article-list empty">Create/select a user, then load a digest.</div>
+        <p class="panel-hint">Preview uses the explainable ranking service without creating digest rows. Feedback selections are restored per user.</p>
+        <div id="digest-list" class="digest-list empty-state">Create or select a user, then load a personalized digest.</div>
       </section>
 
-      <section class="card" aria-labelledby="preferences-heading">
-        <div class="section-title-row">
-          <h2 id="preferences-heading">Preferences</h2>
-          <button id="load-preferences-button" type="button">Reload preferences</button>
+      <section class="panel saved-panel" aria-labelledby="saved-digests-heading">
+        <div class="panel-header">
+          <div>
+            <p class="section-kicker">Persisted output</p>
+            <h2 id="saved-digests-heading">Saved digests</h2>
+          </div>
+          <button id="load-saved-digests-button" type="button" class="button secondary">Refresh</button>
         </div>
-        <p class="hint">Loads <code>/users/{user_id}/preferences</code>.</p>
-        <div id="preferences-list" class="preferences-list empty">No preferences loaded.</div>
+        <p class="panel-hint">Saved digests are persisted snapshots generated from the current ranking order.</p>
+        <div id="saved-digests-list" class="saved-digests-list empty-state">No saved digests loaded.</div>
+        <div id="saved-digest-detail" class="saved-digest-detail empty-state">Select a saved digest to inspect its ranked items.</div>
       </section>
 
-      <section class="card" aria-labelledby="recent-heading">
-        <div class="section-title-row">
-          <h2 id="recent-heading">Recent articles</h2>
-          <button id="load-articles-button" type="button">Load recent</button>
+      <section class="panel preferences-panel" aria-labelledby="preferences-heading">
+        <div class="panel-header">
+          <div>
+            <p class="section-kicker">Feedback learning</p>
+            <h2 id="preferences-heading">Preferences</h2>
+          </div>
+          <button id="load-preferences-button" type="button" class="button secondary">Reload</button>
         </div>
-        <p class="hint">Loads <code>/articles?limit=20</code>.</p>
-        <div id="articles-list" class="article-list empty">No articles loaded.</div>
+        <p class="panel-hint">Topic weights are updated by feedback and influence future digest ranking.</p>
+        <div id="preferences-list" class="preferences-list empty-state">No preferences loaded.</div>
+      </section>
+
+      <section class="panel recent-panel" aria-labelledby="recent-heading">
+        <div class="panel-header">
+          <div>
+            <p class="section-kicker">Ingested content</p>
+            <h2 id="recent-heading">Recent articles</h2>
+          </div>
+          <button id="load-articles-button" type="button" class="button secondary">Load recent</button>
+        </div>
+        <p class="panel-hint">Latest normalized articles available to classification, ranking, and digest generation.</p>
+        <div id="articles-list" class="compact-article-list empty-state">No articles loaded.</div>
       </section>
     </main>
-
-    <template id="article-template">
-      <article class="article-item">
-        <div class="article-main">
-          <a class="article-title" target="_blank" rel="noreferrer"></a>
-          <div class="meta"></div>
-          <div class="topics"></div>
-        </div>
-        <div class="feedback-actions" aria-label="Feedback actions"></div>
-      </article>
-    </template>
 
     <script src="/static/dashboard.js" defer></script>
   </body>

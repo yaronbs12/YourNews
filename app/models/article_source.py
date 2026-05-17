@@ -13,5 +13,6 @@ class ArticleSource(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     url: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="rss", server_default="rss")
+    category: Mapped[str] = mapped_column(String(100), nullable=False, default="general", server_default="general")
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

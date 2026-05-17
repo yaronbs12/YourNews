@@ -176,7 +176,7 @@ def test_get_feedback_filters_by_user_id() -> None:
     try:
         with SessionLocal() as session:
             first_user, first_article, _ = _seed_user_article_topic(session, "first@example.com", "first")
-            second_user, second_article, _ = _seed_user_article_topic(session, "second@example.com", "second", "tech")
+            second_user, second_article, _ = _seed_user_article_topic(session, "second@example.com", "second", "technology")
             create_feedback_and_update_preferences(session, first_user.id, first_article.id, "INTERESTING")
             create_feedback_and_update_preferences(session, second_user.id, second_article.id, "NOT_INTERESTING")
             user_id = first_user.id
@@ -198,7 +198,7 @@ def test_get_feedback_filters_by_article_id() -> None:
     try:
         with SessionLocal() as session:
             first_user, first_article, _ = _seed_user_article_topic(session, "article-first@example.com", "article-first")
-            second_user, second_article, _ = _seed_user_article_topic(session, "article-second@example.com", "article-second", "tech")
+            second_user, second_article, _ = _seed_user_article_topic(session, "article-second@example.com", "article-second", "technology")
             create_feedback_and_update_preferences(session, first_user.id, first_article.id, "INTERESTING")
             create_feedback_and_update_preferences(session, second_user.id, second_article.id, "NOT_INTERESTING")
             article_id = second_article.id
