@@ -69,9 +69,15 @@ The total score is returned by the digest preview API and displayed in the dashb
 - one `Digest` row
 - multiple ordered `DigestItem` rows
 
-### 6. Feedback loop
+### 6. Email-first local delivery
 
-Users can label digest items as interesting, neutral, or not interesting. Feedback updates topic preferences, which are used by the next ranking run.
+The MVP delivery channel is email. `POST /digests/{digest_id}/send` uses a local/dev provider only: it creates a `DigestDelivery` row, renders HTML and text bodies, marks the row as `SENT`, and does not call SMTP, SendGrid, Mailgun, Gmail, Telegram, or any external provider. Telegram can be added later behind the same provider-oriented shape, but it is not implemented now.
+
+Each delivered article contains tracked feedback links for Interesting, Neutral, and Not interesting. The links target `GET /feedback/click` with the delivery id, article id, label, and delivery feedback token.
+
+### 7. Feedback loop
+
+Users can label digest items as interesting, neutral, or not interesting from the dashboard or by clicking links in a delivered email. Feedback updates topic preferences, which are used by the next ranking run.
 
 ## Daily pipeline runner
 

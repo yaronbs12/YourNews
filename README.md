@@ -59,7 +59,7 @@ More detail is available in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
   - freshness score
   - source diversity penalty
 - Persisted digest workflow using existing `Digest` and `DigestItem` models.
-- Delivery preview rendering for persisted digests in HTML-email and plain-text formats.
+- Email-first local/dev delivery records for persisted digests, with tracked feedback links in HTML-email and plain-text bodies.
 - Daily pipeline runner for ingestion → classification → digest generation.
 - Minimal static dashboard served by FastAPI at `/`.
 - Deterministic pytest coverage for ingestion, classification, ranking, feedback, digests, APIs, and CLI runners.
@@ -183,6 +183,19 @@ Preview email-style delivery output without sending email:
 curl "http://127.0.0.1:8000/digests/{digest_id}/delivery-preview"
 ```
 
+Create a local/dev email delivery record. This does not send external email; it stores the rendered HTML/text bodies and feedback links for inspection:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/digests/{digest_id}/send"
+```
+
+List delivery history for a digest or inspect one stored delivery:
+
+```bash
+curl "http://127.0.0.1:8000/digests/{digest_id}/deliveries"
+curl "http://127.0.0.1:8000/deliveries/{delivery_id}"
+```
+
 List a user's saved digests:
 
 ```bash
@@ -210,14 +223,16 @@ Basic flow:
 3. Load a digest preview and inspect rich digest cards with topics plus Ranking v2 score breakdowns.
 4. Submit feedback with the segmented controls; saved selections are restored when the digest reloads.
 5. Reload preferences to see graphical topic weights change.
-6. Generate a saved digest, list saved digests, inspect saved digest details, and view delivery previews.
-7. Load recent articles to inspect ingested content.
+6. Generate a saved digest, list saved digests, inspect saved digest details, and send a local/dev email delivery simulation.
+7. Inspect delivery history and the stored HTML/text email bodies with tracked feedback links.
+8. Load recent articles to inspect ingested content.
 
 ## Product coverage updates
 
-Recent MVP additions make the product demo broader without adding real delivery infrastructure:
+Recent MVP additions make the product demo broader while keeping external provider integrations out of scope:
 
-- **Delivery preview:** persisted digests can be rendered as HTML email-style content and plain text via `GET /digests/{digest_id}/delivery-preview`. No real email is sent.
+- **Email-first delivery architecture:** persisted digests can be rendered as HTML email-style content and plain text via `GET /digests/{digest_id}/delivery-preview`, then stored as local/dev email delivery records via `POST /digests/{digest_id}/send`. No real external email is sent.
+- **Tracked email feedback:** each delivered article includes normal links for Interesting, Neutral, and Not interesting actions. The links call `GET /feedback/click` and update preferences for future digests.
 - **Broader sources:** default RSS seeding now covers general news, world/news, technology, business/finance, science, and sports sources.
 - **Expanded topics:** classification includes sports (`football`, `basketball`, `tennis`), politics/world/Israel, technology/AI/cybersecurity, business/finance/startups, science/health/climate, and culture/entertainment/gaming.
 
@@ -264,7 +279,8 @@ For recruiters and reviewers, YourNews demonstrates practical backend engineerin
 Realistic next steps:
 
 - Add scheduled jobs for the daily pipeline.
-- Add email delivery for persisted digests.
+- Add a real email provider such as SMTP or SendGrid behind the existing local delivery interface.
+- Consider Telegram as a future delivery provider; it is not implemented in the MVP.
 - Improve topic classification with richer rules or a dedicated classifier.
 - Build a more complete frontend while keeping the API-first design.
 

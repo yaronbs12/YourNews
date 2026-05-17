@@ -5,6 +5,7 @@ const state = {
   savedDigests: [],
   recentArticles: [],
   preferences: [],
+  deliveriesByDigestId: new Map(),
 };
 
 const elements = {
@@ -180,6 +181,83 @@ function updateFeedbackButtons(card, selectedLabel, isSaving = false) {
     button.setAttribute("aria-pressed", String(isActive));
     button.disabled = isSaving;
   });
+
+  const status = document.createElement("p");
+  status.className = "inline-status";
+  status.textContent = selectedLabel ? `Saved as ${labelToText(selectedLabel)}.` : "Choose a signal to tune recommendations.";
+
+  panel.append(segmented, status);
+  updateFeedbackButtons(panel, selectedLabel);
+  return panel;
+}
+
+function labelToText(label) {
+  return feedbackOptions.find((option) => option.value === label)?.label || label;
+}
+
+function createDigestCard(article) {
+  const card = document.createElement("article");
+  card.className = "digest-card";
+  const articleId = article.article_id || article.id;
+  card.dataset.articleId = articleId;
+
+  const main = document.createElement("div");
+  main.className = "digest-card-main";
+  main.innerHTML = `
+    <div class="digest-card-header">
+      <div>
+        <span class="rank-badge">#${article.rank || "—"}</span>
+        <a class="article-title" target="_blank" rel="noreferrer"></a>
+        <div class="card-meta"></div>
+      </div>
+      <span class="score-pill">Score ${article.score ?? "—"}</span>
+    </div>
+    <div class="topics"></div>
+  `;
+  const title = main.querySelector(".article-title");
+  title.textContent = article.title;
+  title.href = article.url;
+  const articleDate = formatDate(article.published_at || article.created_at);
+  main.querySelector(".card-meta").textContent = `${article.source_name || "Unknown source"} · ${articleDate}`;
+  renderTopics(main.querySelector(".topics"), article.topics || []);
+  main.append(renderScoreBreakdown(article));
+
+  card.append(main, renderFeedbackControl(article, card));
+  return card;
+}
+
+function renderDigest(items) {
+  clearStateClass(elements.digestList);
+  elements.digestList.replaceChildren();
+
+  if (!items || items.length === 0) {
+    setEmpty(elements.digestList, "No ranked articles found for this user yet.");
+    return;
+  }
+
+  items.forEach((article) => elements.digestList.append(createDigestCard(article)));
+}
+
+function createCompactArticleCard(article, { rank } = {}) {
+  const card = document.createElement("article");
+  card.className = "compact-article-card";
+  card.innerHTML = `
+    <div class="article-card-header">
+      <div>
+        ${rank ? `<span class="rank-badge">#${rank}</span>` : ""}
+        <a class="article-title" target="_blank" rel="noreferrer"></a>
+        <div class="card-meta"></div>
+      </div>
+    </div>
+    <div class="topics"></div>
+  `;
+  const title = card.querySelector(".article-title");
+  title.textContent = article.title;
+  title.href = article.url;
+  const articleDate = formatDate(article.published_at || article.created_at);
+  card.querySelector(".card-meta").textContent = `${article.source_name || "Unknown source"} · ${articleDate}`;
+  renderTopics(card.querySelector(".topics"), article.topics || []);
+  return card;
 }
 
 function renderFeedbackControl(article, card) {
@@ -345,10 +423,17 @@ function renderSavedDigestDetail(digest) {
     <div>
       <strong>Digest #${digest.id}</strong>
       <p class="saved-meta">Created ${createdAt} · ${digest.items.length} items</p>
+      <p class="saved-meta">Email delivery is local/dev simulation only; no external email is sent.</p>
     </div>
-    <button type="button" class="button secondary">View delivery preview</button>
+    <div class="button-row">
+      <button type="button" class="button primary" data-action="send">Send email digest</button>
+      <button type="button" class="button secondary" data-action="preview">View delivery preview</button>
+      <button type="button" class="button secondary" data-action="history">Refresh deliveries</button>
+    </div>
   `;
-  header.querySelector("button").addEventListener("click", () => loadDeliveryPreview(digest.id));
+  header.querySelector('[data-action="send"]').addEventListener("click", (event) => sendEmailDigest(digest.id, event.currentTarget));
+  header.querySelector('[data-action="preview"]').addEventListener("click", () => loadDeliveryPreview(digest.id));
+  header.querySelector('[data-action="history"]').addEventListener("click", () => loadDeliveryHistory(digest.id));
   const list = document.createElement("div");
   list.className = "saved-detail-list";
   digest.items.forEach((item) => {
@@ -360,7 +445,109 @@ function renderSavedDigestDetail(digest) {
   const delivery = document.createElement("div");
   delivery.className = "delivery-preview empty-state";
   delivery.textContent = "Delivery preview not loaded.";
-  elements.savedDigestDetail.append(header, list, delivery);
+  const history = document.createElement("div");
+  history.className = "delivery-history empty-state";
+  history.textContent = "Delivery history not loaded.";
+  elements.savedDigestDetail.append(header, list, delivery, history);
+  loadDeliveryHistory(digest.id);
+}
+
+
+function renderDeliveryRecord(delivery) {
+  const card = document.createElement("article");
+  card.className = "delivery-card";
+  card.innerHTML = `
+    <div class="delivery-card-header">
+      <div>
+        <strong>Delivery #${delivery.id}</strong>
+        <p class="saved-meta">${delivery.channel} · ${delivery.provider} · ${delivery.status} · sent ${formatDate(delivery.sent_at)}</p>
+        <p class="saved-meta">To: ${delivery.recipient_email || "unknown"}</p>
+      </div>
+      <button type="button" class="button secondary">View stored body</button>
+    </div>
+    <div class="delivery-grid delivery-body" hidden>
+      <section>
+        <h4>Plain text email</h4>
+        <pre class="delivery-text"></pre>
+      </section>
+      <section>
+        <h4>Stored HTML email</h4>
+        <iframe class="delivery-html" title="Stored delivered digest"></iframe>
+      </section>
+    </div>
+  `;
+  const body = card.querySelector(".delivery-body");
+  const button = card.querySelector("button");
+  card.querySelector(".delivery-text").textContent = delivery.text_body;
+  card.querySelector("iframe").srcdoc = delivery.html_body;
+  button.addEventListener("click", () => {
+    body.hidden = !body.hidden;
+    button.textContent = body.hidden ? "View stored body" : "Hide stored body";
+  });
+  return card;
+}
+
+function renderDeliveryHistory(digestId, deliveries) {
+  const container = elements.savedDigestDetail.querySelector(".delivery-history");
+  if (!container) return;
+  state.deliveriesByDigestId.set(digestId, deliveries || []);
+  clearStateClass(container);
+  container.classList.add("delivery-history");
+  container.replaceChildren();
+
+  const heading = document.createElement("div");
+  heading.className = "delivery-header";
+  heading.innerHTML = `
+    <div>
+      <span class="section-kicker">Email delivery history</span>
+      <h3>Local/dev deliveries</h3>
+      <p class="saved-meta">These records simulate email sends and store the exact HTML/text bodies with tracked feedback links.</p>
+    </div>
+  `;
+  container.append(heading);
+
+  if (!deliveries || deliveries.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "No deliveries yet. Use Send email digest to create a local email delivery record.";
+    container.append(empty);
+    return;
+  }
+
+  deliveries.forEach((delivery) => container.append(renderDeliveryRecord(delivery)));
+}
+
+async function loadDeliveryHistory(digestId) {
+  const container = elements.savedDigestDetail.querySelector(".delivery-history");
+  if (!container) return;
+  try {
+    setLoading(container, `Loading delivery history for digest #${digestId}...`);
+    const deliveries = await apiFetch(`/digests/${digestId}/deliveries`);
+    renderDeliveryHistory(digestId, deliveries);
+  } catch (error) {
+    setError(container, `Delivery history failed: ${error.message}`);
+  }
+}
+
+async function sendEmailDigest(digestId, button) {
+  try {
+    button.disabled = true;
+    button.textContent = "Sending...";
+    const delivery = await apiFetch(`/digests/${digestId}/send`, { method: "POST" });
+    showToast(`Local email delivery #${delivery.id} marked ${delivery.status}.`, "success");
+    renderDeliveryPreview({
+      subject: delivery.subject,
+      user_email: delivery.recipient_email,
+      text_body: delivery.text_body,
+      html_body: delivery.html_body,
+    });
+    await loadDeliveryHistory(digestId);
+  } catch (error) {
+    showToast(`Send email digest failed: ${error.message}`, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Send email digest";
+  }
 }
 
 function renderDeliveryPreview(preview) {

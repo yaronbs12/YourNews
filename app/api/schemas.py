@@ -12,6 +12,7 @@ __all__ = [
     "DigestRead",
     "DigestSummaryRead",
     "DeliveryPreviewRead",
+    "DigestDeliveryRead",
     "FeedbackCreate",
     "FeedbackRead",
     "UserCreate",
@@ -102,6 +103,23 @@ class DeliveryPreviewRead(BaseModel):
     created_at: datetime
     html_body: str
     text_body: str
+
+
+class DigestDeliveryRead(BaseModel):
+    id: int
+    digest_id: int
+    user_id: int
+    channel: str
+    provider: str
+    recipient_email: str | None
+    subject: str
+    html_body: str
+    text_body: str
+    status: str
+    feedback_token: str
+    error_message: str | None
+    created_at: datetime
+    sent_at: datetime | None
 
 
 class FeedbackCreate(BaseModel):

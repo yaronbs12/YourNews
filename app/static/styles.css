@@ -760,3 +760,27 @@ h3 {
     grid-template-columns: 1fr;
   }
 }
+
+.delivery-history {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.delivery-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.delivery-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.delivery-body {
+  margin-top: 1rem;
+}

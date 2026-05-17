@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -13,8 +13,10 @@ from app.models import *  # noqa: F403,F401
 from app.models.article import Article
 from app.models.article_source import ArticleSource
 from app.models.associations import ArticleTopic
-from app.models.digest import Digest, DigestItem
+from app.models.digest import Digest, DigestDelivery, DigestItem
+from app.models.feedback import Feedback
 from app.models.topic import Topic
+from app.models.user_preference import UserPreference
 from app.models.user import User
 
 NOW = datetime(2026, 5, 7, tzinfo=timezone.utc)
@@ -130,3 +132,178 @@ def test_delivery_preview_endpoint_returns_404_for_unknown_digest() -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Digest not found"
+
+
+def test_send_digest_creates_local_email_delivery_with_feedback_links() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+        article_ids = session.scalars(
+            select(DigestItem.article_id).where(DigestItem.digest_id == digest_id).order_by(DigestItem.rank.asc())
+        ).all()
+
+    response = client.post(f"/digests/{digest_id}/send")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["digest_id"] == digest_id
+    assert payload["channel"] == "email"
+    assert payload["provider"] == "local"
+    assert payload["recipient_email"] == "reader@example.com"
+    assert payload["status"] == "SENT"
+    assert payload["sent_at"] is not None
+    assert payload["feedback_token"]
+    assert "local/dev email simulation" in payload["text_body"]
+    assert "Local/dev email simulation" in payload["html_body"]
+    for article_id in article_ids:
+        for label in ["INTERESTING", "NEUTRAL", "NOT_INTERESTING"]:
+            expected = f"/feedback/click?delivery_id={payload['id']}&article_id={article_id}&label={label}"
+            assert expected in payload["text_body"]
+            assert expected.replace("&", "&amp;") in payload["html_body"]
+
+    with SessionLocal() as session:
+        deliveries = session.scalars(select(DigestDelivery).where(DigestDelivery.digest_id == digest_id)).all()
+        assert len(deliveries) == 1
+        assert deliveries[0].channel == "email"
+        assert deliveries[0].provider == "local"
+        assert deliveries[0].status.name == "SENT"
+
+
+def test_digest_delivery_history_and_detail_endpoints_return_delivery_records() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+
+    send_response = client.post(f"/digests/{digest_id}/send")
+    delivery_id = send_response.json()["id"]
+
+    history_response = client.get(f"/digests/{digest_id}/deliveries")
+    detail_response = client.get(f"/deliveries/{delivery_id}")
+
+    assert history_response.status_code == 200
+    history = history_response.json()
+    assert len(history) == 1
+    assert history[0]["id"] == delivery_id
+    assert history[0]["status"] == "SENT"
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["id"] == delivery_id
+    assert detail["html_body"] == history[0]["html_body"]
+    assert detail["text_body"] == history[0]["text_body"]
+
+
+def test_feedback_click_with_valid_token_creates_feedback_and_updates_preferences() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+        article_id = session.scalar(
+            select(DigestItem.article_id).where(DigestItem.digest_id == digest_id, DigestItem.rank == 1)
+        )
+
+    delivery = client.post(f"/digests/{digest_id}/send").json()
+    response = client.get(
+        "/feedback/click",
+        params={
+            "delivery_id": delivery["id"],
+            "article_id": article_id,
+            "label": "INTERESTING",
+            "token": delivery["feedback_token"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "YourNews" in response.text
+    assert "Feedback saved" in response.text
+    assert "AI Story" in response.text
+    assert "Future YourNews digests" in response.text
+    with SessionLocal() as session:
+        feedback_rows = session.scalars(select(Feedback).where(Feedback.article_id == article_id)).all()
+        assert len(feedback_rows) == 1
+        assert feedback_rows[0].label.name == "INTERESTING"
+        preference = session.scalar(select(UserPreference).join(Topic).where(Topic.name == "ai"))
+        assert preference is not None
+        assert preference.weight == 2
+
+
+def test_feedback_click_rejects_invalid_token() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+        article_id = session.scalar(select(DigestItem.article_id).where(DigestItem.digest_id == digest_id))
+
+    delivery = client.post(f"/digests/{digest_id}/send").json()
+    response = client.get(
+        "/feedback/click",
+        params={
+            "delivery_id": delivery["id"],
+            "article_id": article_id,
+            "label": "INTERESTING",
+            "token": "wrong-token",
+        },
+    )
+
+    assert response.status_code == 403
+    assert "text/html" in response.headers["content-type"]
+    assert "Invalid feedback token" in response.text
+
+
+def test_feedback_click_rejects_article_not_in_digest() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+        source = session.scalar(select(ArticleSource))
+        other_article = Article(
+            source_id=source.id,
+            title="Outside Story",
+            url="https://example.com/outside",
+            content=None,
+            published_at=None,
+            created_at=NOW,
+        )
+        session.add(other_article)
+        session.commit()
+        other_article_id = other_article.id
+
+    delivery = client.post(f"/digests/{digest_id}/send").json()
+    response = client.get(
+        "/feedback/click",
+        params={
+            "delivery_id": delivery["id"],
+            "article_id": other_article_id,
+            "label": "INTERESTING",
+            "token": delivery["feedback_token"],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "text/html" in response.headers["content-type"]
+    assert "not part of the delivered digest" in response.text
+
+
+def test_feedback_click_rejects_invalid_label() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+        article_id = session.scalar(select(DigestItem.article_id).where(DigestItem.digest_id == digest_id))
+
+    delivery = client.post(f"/digests/{digest_id}/send").json()
+    response = client.get(
+        "/feedback/click",
+        params={
+            "delivery_id": delivery["id"],
+            "article_id": article_id,
+            "label": "VERY_GOOD",
+            "token": delivery["feedback_token"],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "text/html" in response.headers["content-type"]
+    assert "Invalid feedback label" in response.text

@@ -74,6 +74,25 @@ Preview delivery output without sending email:
 curl "http://127.0.0.1:8000/digests/{digest_id}/delivery-preview"
 ```
 
+Create a local/dev email delivery record. The local provider marks the delivery as `SENT`, stores the rendered bodies, and does not send external email:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/digests/{digest_id}/send"
+```
+
+List delivery history and inspect a stored delivery:
+
+```bash
+curl "http://127.0.0.1:8000/digests/{digest_id}/deliveries"
+curl "http://127.0.0.1:8000/deliveries/{delivery_id}"
+```
+
+Email bodies include tracked feedback links shaped like:
+
+```text
+http://127.0.0.1:8000/feedback/click?delivery_id={delivery_id}&article_id={article_id}&label=INTERESTING&token={feedback_token}
+```
+
 List saved digests for a user:
 
 ```bash
