@@ -13,11 +13,26 @@ from app.models.user_preference import UserPreference
 
 TOPIC_SCORE_WEIGHTS: dict[str, int] = {
     "ai": 3,
+    "technology": 2,
     "tech": 2,
+    "cybersecurity": 2,
     "security": 2,
+    "sports": 2,
+    "football": 2,
+    "basketball": 2,
+    "tennis": 2,
+    "politics": 2,
+    "world": 2,
+    "israel": 2,
     "business": 1,
-    "science": 1,
     "finance": 1,
+    "startups": 1,
+    "science": 1,
+    "health": 1,
+    "culture": 1,
+    "entertainment": 1,
+    "gaming": 1,
+    "climate": 1,
     "general": 0,
 }
 FRESHNESS_RECENT_SCORE = 2

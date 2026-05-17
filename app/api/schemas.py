@@ -11,6 +11,7 @@ __all__ = [
     "DigestItemRead",
     "DigestRead",
     "DigestSummaryRead",
+    "DeliveryPreviewRead",
     "FeedbackCreate",
     "FeedbackRead",
     "UserCreate",
@@ -35,6 +36,7 @@ class SourceRead(BaseModel):
     name: str
     url: str
     source_type: str
+    category: str
     enabled: bool
     last_fetched_at: datetime | None
 
@@ -91,6 +93,15 @@ class DigestSummaryRead(BaseModel):
     user_id: int
     created_at: datetime
     item_count: int
+
+
+class DeliveryPreviewRead(BaseModel):
+    subject: str
+    user_email: str | None
+    digest_id: int
+    created_at: datetime
+    html_body: str
+    text_body: str
 
 
 class FeedbackCreate(BaseModel):

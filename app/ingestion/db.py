@@ -7,7 +7,7 @@ from app.models.article_source import ArticleSource
 
 
 def get_or_create_article_source(
-    session: Session, name: str, url: str, source_type: str = "rss"
+    session: Session, name: str, url: str, source_type: str = "rss", category: str = "general"
 ) -> ArticleSource:
     source = session.scalar(select(ArticleSource).where(ArticleSource.url == url))
     if source is not None:
@@ -17,14 +17,14 @@ def get_or_create_article_source(
     if source is not None:
         return source
 
-    source = ArticleSource(name=name, url=url, source_type=source_type, enabled=True)
+    source = ArticleSource(name=name, url=url, source_type=source_type, category=category, enabled=True)
     session.add(source)
     session.flush()
     return source
 
 
 def insert_new_articles(
-    session: Session, articles: list[NormalizedArticle], source_type: str = "rss"
+    session: Session, articles: list[NormalizedArticle], source_type: str = "rss", category: str = "general"
 ) -> list[Article]:
     inserted: list[Article] = []
     seen_urls: set[str] = set()
@@ -43,6 +43,7 @@ def insert_new_articles(
             name=article.source,
             url=article.source_url,
             source_type=source_type,
+            category=category,
         )
         db_article = Article(
             source_id=source.id,

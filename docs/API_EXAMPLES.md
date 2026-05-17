@@ -68,6 +68,12 @@ Read a persisted digest:
 curl "http://127.0.0.1:8000/digests/{digest_id}"
 ```
 
+Preview delivery output without sending email:
+
+```bash
+curl "http://127.0.0.1:8000/digests/{digest_id}/delivery-preview"
+```
+
 List saved digests for a user:
 
 ```bash

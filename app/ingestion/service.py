@@ -23,7 +23,7 @@ def ingest_rss_feed(session: Session, feed_url: str) -> int:
 def ingest_hacker_news_stories(session: Session, story_type: str = "top", limit: int = 30) -> int:
     try:
         articles = fetch_hacker_news_articles(story_type=story_type, limit=limit)
-        inserted_articles = insert_new_articles(session, articles, source_type="hacker_news")
+        inserted_articles = insert_new_articles(session, articles, source_type="hacker_news", category="technology")
         session.commit()
         return len(inserted_articles)
     except Exception:

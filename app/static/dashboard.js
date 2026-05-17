@@ -280,6 +280,104 @@ function createCompactArticleCard(article, { rank } = {}) {
   return card;
 }
 
+function renderFeedbackControl(article, card) {
+  const panel = document.createElement("div");
+  panel.className = "feedback-panel";
+  const articleId = article.article_id || article.id;
+  const selectedLabel = state.feedbackByArticleId.get(articleId);
+  panel.innerHTML = `<div class="feedback-label">Your feedback</div>`;
+
+  const segmented = document.createElement("div");
+  segmented.className = "segmented-control";
+  feedbackOptions.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "feedback-option";
+    button.dataset.label = option.value;
+    button.setAttribute("aria-pressed", String(selectedLabel === option.value));
+    button.innerHTML = `<span>${option.icon}</span><span>${option.label}</span>`;
+    button.addEventListener("click", () => submitFeedback(articleId, option.value, card));
+    segmented.append(button);
+  });
+
+  const status = document.createElement("p");
+  status.className = "inline-status";
+  status.textContent = selectedLabel ? `Saved as ${labelToText(selectedLabel)}.` : "Choose a signal to tune recommendations.";
+
+  panel.append(segmented, status);
+  updateFeedbackButtons(panel, selectedLabel);
+  return panel;
+}
+
+function labelToText(label) {
+  return feedbackOptions.find((option) => option.value === label)?.label || label;
+}
+
+function createDigestCard(article) {
+  const card = document.createElement("article");
+  card.className = "digest-card";
+  const articleId = article.article_id || article.id;
+  card.dataset.articleId = articleId;
+
+  const main = document.createElement("div");
+  main.className = "digest-card-main";
+  main.innerHTML = `
+    <div class="digest-card-header">
+      <div>
+        <span class="rank-badge">#${article.rank || "—"}</span>
+        <a class="article-title" target="_blank" rel="noreferrer"></a>
+        <div class="card-meta"></div>
+      </div>
+      <span class="score-pill">Score ${article.score ?? "—"}</span>
+    </div>
+    <div class="topics"></div>
+  `;
+  const title = main.querySelector(".article-title");
+  title.textContent = article.title;
+  title.href = article.url;
+  const articleDate = formatDate(article.published_at || article.created_at);
+  main.querySelector(".card-meta").textContent = `${article.source_name || "Unknown source"} · ${articleDate}`;
+  renderTopics(main.querySelector(".topics"), article.topics || []);
+  main.append(renderScoreBreakdown(article));
+
+  card.append(main, renderFeedbackControl(article, card));
+  return card;
+}
+
+function renderDigest(items) {
+  clearStateClass(elements.digestList);
+  elements.digestList.replaceChildren();
+
+  if (!items || items.length === 0) {
+    setEmpty(elements.digestList, "No ranked articles found for this user yet.");
+    return;
+  }
+
+  items.forEach((article) => elements.digestList.append(createDigestCard(article)));
+}
+
+function createCompactArticleCard(article, { rank } = {}) {
+  const card = document.createElement("article");
+  card.className = "compact-article-card";
+  card.innerHTML = `
+    <div class="article-card-header">
+      <div>
+        ${rank ? `<span class="rank-badge">#${rank}</span>` : ""}
+        <a class="article-title" target="_blank" rel="noreferrer"></a>
+        <div class="card-meta"></div>
+      </div>
+    </div>
+    <div class="topics"></div>
+  `;
+  const title = card.querySelector(".article-title");
+  title.textContent = article.title;
+  title.href = article.url;
+  const articleDate = formatDate(article.published_at || article.created_at);
+  card.querySelector(".card-meta").textContent = `${article.source_name || "Unknown source"} · ${articleDate}`;
+  renderTopics(card.querySelector(".topics"), article.topics || []);
+  return card;
+}
+
 function renderPreferences(preferences) {
   state.preferences = [...(preferences || [])].sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
   updateMetrics();
@@ -339,8 +437,16 @@ function renderSavedDigestDetail(digest) {
   clearStateClass(elements.savedDigestDetail);
   elements.savedDigestDetail.replaceChildren();
   const header = document.createElement("div");
+  header.className = "saved-detail-header";
   const createdAt = formatDate(digest.created_at);
-  header.innerHTML = `<strong>Digest #${digest.id}</strong><p class="saved-meta">Created ${createdAt} · ${digest.items.length} items</p>`;
+  header.innerHTML = `
+    <div>
+      <strong>Digest #${digest.id}</strong>
+      <p class="saved-meta">Created ${createdAt} · ${digest.items.length} items</p>
+    </div>
+    <button type="button" class="button secondary">View delivery preview</button>
+  `;
+  header.querySelector("button").addEventListener("click", () => loadDeliveryPreview(digest.id));
   const list = document.createElement("div");
   list.className = "saved-detail-list";
   digest.items.forEach((item) => {
@@ -349,7 +455,56 @@ function renderSavedDigestDetail(digest) {
     row.append(createCompactArticleCard(item, { rank: item.rank }));
     list.append(row);
   });
-  elements.savedDigestDetail.append(header, list);
+  const delivery = document.createElement("div");
+  delivery.className = "delivery-preview empty-state";
+  delivery.textContent = "Delivery preview not loaded.";
+  elements.savedDigestDetail.append(header, list, delivery);
+}
+
+function renderDeliveryPreview(preview) {
+  const container = elements.savedDigestDetail.querySelector(".delivery-preview");
+  if (!container) return;
+  clearStateClass(container);
+  container.classList.add("delivery-preview");
+  container.replaceChildren();
+
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
+    <div class="delivery-header">
+      <div>
+        <span class="section-kicker">Delivery preview</span>
+        <h3></h3>
+        <p class="saved-meta"></p>
+      </div>
+    </div>
+    <div class="delivery-grid">
+      <section>
+        <h4>Plain text</h4>
+        <pre class="delivery-text"></pre>
+      </section>
+      <section>
+        <h4>HTML preview</h4>
+        <iframe class="delivery-html" title="Rendered digest delivery preview"></iframe>
+      </section>
+    </div>
+  `;
+  wrapper.querySelector("h3").textContent = preview.subject;
+  wrapper.querySelector(".saved-meta").textContent = `To: ${preview.user_email || "unknown"}`;
+  wrapper.querySelector(".delivery-text").textContent = preview.text_body;
+  container.append(wrapper);
+  container.querySelector("iframe").srcdoc = preview.html_body;
+}
+
+async function loadDeliveryPreview(digestId) {
+  const container = elements.savedDigestDetail.querySelector(".delivery-preview");
+  if (!container) return;
+  try {
+    setLoading(container, `Loading delivery preview for digest #${digestId}...`);
+    const preview = await apiFetch(`/digests/${digestId}/delivery-preview`);
+    renderDeliveryPreview(preview);
+  } catch (error) {
+    setError(container, `Delivery preview failed: ${error.message}`);
+  }
 }
 
 function renderRecentArticles(articles) {

@@ -11,10 +11,12 @@ from app.api.schemas import (
     DigestRead,
     DigestScoreBreakdown,
     DigestSummaryRead,
+    DeliveryPreviewRead,
     FeedbackCreate,
     FeedbackRead,
     SourceRead,
 )
+from app.delivery.service import DeliveryPreviewNotFoundError, render_digest_delivery_preview
 from app.digests.service import DigestUserNotFoundError, EmptyDigestError, generate_digest_for_user
 from app.models.article import Article
 from app.models.article_source import ArticleSource
@@ -103,6 +105,7 @@ def list_sources(db: Session = Depends(get_db)) -> list[SourceRead]:
             name=source.name,
             url=source.url,
             source_type=source.source_type,
+            category=source.category,
             enabled=source.enabled,
             last_fetched_at=source.last_fetched_at,
         )
@@ -170,6 +173,23 @@ def get_digest(digest_id: int, db: Session = Depends(get_db)) -> DigestRead:
     if digest is None:
         raise HTTPException(status_code=404, detail="Digest not found")
     return _digest_to_read(db, digest)
+
+
+@router.get("/digests/{digest_id}/delivery-preview", response_model=DeliveryPreviewRead)
+def get_digest_delivery_preview(digest_id: int, db: Session = Depends(get_db)) -> DeliveryPreviewRead:
+    try:
+        preview = render_digest_delivery_preview(db, digest_id)
+    except DeliveryPreviewNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return DeliveryPreviewRead(
+        subject=preview.subject,
+        user_email=preview.user_email,
+        digest_id=preview.digest_id,
+        created_at=preview.created_at,
+        html_body=preview.html_body,
+        text_body=preview.text_body,
+    )
 
 
 @router.get("/users/{user_id}/digests", response_model=list[DigestSummaryRead])

@@ -48,10 +48,10 @@ More detail is available in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 - FastAPI backend with health, article, source, user, feedback, digest preview, and persisted digest endpoints.
 - PostgreSQL data model managed with SQLAlchemy and Alembic.
-- RSS ingestion using seeded RSS sources.
+- RSS ingestion using seeded RSS sources across general news, world, technology, business/finance, science, and sports.
 - Hacker News ingestion from the public Firebase API (`top`, `new`, and `best` stories).
 - URL normalization and database-level deduplication.
-- Topic classification for article ranking and user preferences.
+- Expanded topic classification covering sports, politics/world, technology, cybersecurity, business/finance, science, health, culture, entertainment, gaming, climate, and more.
 - Feedback loop with `INTERESTING`, `NEUTRAL`, and `NOT_INTERESTING` labels.
 - Ranking v2 with explainable score breakdowns:
   - topic score
@@ -59,6 +59,7 @@ More detail is available in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
   - freshness score
   - source diversity penalty
 - Persisted digest workflow using existing `Digest` and `DigestItem` models.
+- Delivery preview rendering for persisted digests in HTML-email and plain-text formats.
 - Daily pipeline runner for ingestion → classification → digest generation.
 - Minimal static dashboard served by FastAPI at `/`.
 - Deterministic pytest coverage for ingestion, classification, ranking, feedback, digests, APIs, and CLI runners.
@@ -176,6 +177,12 @@ Read a persisted digest:
 curl "http://127.0.0.1:8000/digests/{digest_id}"
 ```
 
+Preview email-style delivery output without sending email:
+
+```bash
+curl "http://127.0.0.1:8000/digests/{digest_id}/delivery-preview"
+```
+
 List a user's saved digests:
 
 ```bash
@@ -203,8 +210,16 @@ Basic flow:
 3. Load a digest preview and inspect rich digest cards with topics plus Ranking v2 score breakdowns.
 4. Submit feedback with the segmented controls; saved selections are restored when the digest reloads.
 5. Reload preferences to see graphical topic weights change.
-6. Generate a saved digest, list saved digests, and inspect saved digest details.
+6. Generate a saved digest, list saved digests, inspect saved digest details, and view delivery previews.
 7. Load recent articles to inspect ingested content.
+
+## Product coverage updates
+
+Recent MVP additions make the product demo broader without adding real delivery infrastructure:
+
+- **Delivery preview:** persisted digests can be rendered as HTML email-style content and plain text via `GET /digests/{digest_id}/delivery-preview`. No real email is sent.
+- **Broader sources:** default RSS seeding now covers general news, world/news, technology, business/finance, science, and sports sources.
+- **Expanded topics:** classification includes sports (`football`, `basketball`, `tennis`), politics/world/Israel, technology/AI/cybersecurity, business/finance/startups, science/health/climate, and culture/entertainment/gaming.
 
 ## Local development without Docker
 
