@@ -462,6 +462,10 @@ async function loadDigest() {
 
 async function generateSavedDigest() {
   if (!requireUser()) return;
+  const panel = card.querySelector(".feedback-panel");
+  const status = card.querySelector(".inline-status");
+  const previousLabel = state.feedbackByArticleId.get(articleId);
+
   try {
     elements.generateDigestButton.disabled = true;
     elements.generateDigestButton.textContent = "Generating...";
