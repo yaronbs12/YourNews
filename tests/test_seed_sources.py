@@ -34,7 +34,7 @@ def test_seed_default_rss_sources_is_idempotent() -> None:
         assert len(session.scalars(select(ArticleSource)).all()) == len(DEFAULT_RSS_SOURCES)
 
 
-def test_seeded_sources_have_rss_type_and_enabled() -> None:
+def test_seeded_sources_have_rss_type_enabled_and_categories() -> None:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
@@ -45,3 +45,17 @@ def test_seeded_sources_have_rss_type_and_enabled() -> None:
 
         assert all(source.source_type == "rss" for source in sources)
         assert all(source.enabled is True for source in sources)
+        assert all(source.category for source in sources)
+
+
+def test_seeded_sources_cover_diverse_categories_and_include_sports() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    SessionLocal = sessionmaker(bind=engine)
+
+    with SessionLocal() as session:
+        seed_default_rss_sources(session)
+        categories = {source.category for source in session.scalars(select(ArticleSource)).all()}
+
+        assert {"general", "world", "technology", "business", "science", "sports"}.issubset(categories)
+        assert any(source.category == "sports" for source in session.scalars(select(ArticleSource)).all())

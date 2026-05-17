@@ -92,3 +92,73 @@ def test_run_topics_main_calls_service_and_prints(capsys) -> None:
 
     classify.assert_called_once_with(session_local.return_value.__enter__.return_value)
     assert "Classified 7 articles." in capsys.readouterr().out
+
+
+def test_classify_article_text_detects_football_article() -> None:
+    topics = classify_article_text(
+        "NFL quarterback throws winning touchdown",
+        "The football team advanced in the playoffs after a dramatic game.",
+    )
+
+    assert "football" in topics
+    assert "sports" in topics
+
+
+def test_classify_article_text_detects_basketball_article() -> None:
+    topics = classify_article_text(
+        "NBA playoffs: point guard hits three-pointer",
+        "The basketball team celebrated a late dunk.",
+    )
+
+    assert "basketball" in topics
+    assert "sports" in topics
+
+
+def test_classify_article_text_detects_tennis_article() -> None:
+    topics = classify_article_text(
+        "Wimbledon champion wins grand slam final",
+        "The tennis star used a strong serve and forehand.",
+    )
+
+    assert "tennis" in topics
+
+
+def test_classify_article_text_detects_israel_world_politics_article() -> None:
+    topics = classify_article_text(
+        "Israel government discusses Gaza border policy",
+        "The prime minister and foreign diplomats responded to the conflict.",
+    )
+
+    assert "israel" in topics
+    assert "world" in topics
+    assert "politics" in topics
+
+
+def test_classify_article_text_detects_startup_business_article() -> None:
+    topics = classify_article_text(
+        "Startup raises Series A funding",
+        "The founder said the company will grow revenue after the venture round.",
+    )
+
+    assert "startups" in topics
+    assert "business" in topics
+
+
+def test_classify_article_text_detects_gaming_entertainment_article() -> None:
+    topics = classify_article_text(
+        "Netflix announces video game adaptation",
+        "The gaming studio and Hollywood film producers will stream the series.",
+    )
+
+    assert "gaming" in topics
+    assert "entertainment" in topics
+
+
+def test_classify_article_text_detects_climate_science_article() -> None:
+    topics = classify_article_text(
+        "Scientists publish climate study on carbon emissions",
+        "NASA researchers measured warming and renewable energy impacts.",
+    )
+
+    assert "climate" in topics
+    assert "science" in topics
