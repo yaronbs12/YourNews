@@ -183,7 +183,7 @@ Preview email-style delivery output without sending email:
 curl "http://127.0.0.1:8000/digests/{digest_id}/delivery-preview"
 ```
 
-Create a local/dev email delivery record. This does not send external email; it stores the rendered HTML/text bodies and feedback links for inspection:
+Send a digest through the configured provider (`EMAIL_PROVIDER=local` for simulation, `EMAIL_PROVIDER=smtp` for real email delivery):
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/digests/{digest_id}/send"
@@ -223,7 +223,7 @@ Basic flow:
 3. Load a digest preview and inspect rich digest cards with topics plus Ranking v2 score breakdowns.
 4. Submit feedback with the segmented controls; saved selections are restored when the digest reloads.
 5. Reload preferences to see graphical topic weights change.
-6. Generate a saved digest, list saved digests, inspect saved digest details, and send a local/dev email delivery simulation.
+6. Generate a saved digest, list saved digests, inspect saved digest details, and send a digest (local simulation or SMTP).
 7. Inspect delivery history and the stored HTML/text email bodies with tracked feedback links.
 8. Load recent articles to inspect ingested content.
 
@@ -231,7 +231,7 @@ Basic flow:
 
 Recent MVP additions make the product demo broader while keeping external provider integrations out of scope:
 
-- **Email-first delivery architecture:** persisted digests can be rendered as HTML email-style content and plain text via `GET /digests/{digest_id}/delivery-preview`, then stored as local/dev email delivery records via `POST /digests/{digest_id}/send`. No real external email is sent.
+- **Email-first delivery architecture:** persisted digests can be rendered as HTML email-style content and plain text via `GET /digests/{digest_id}/delivery-preview`, then sent via `POST /digests/{digest_id}/send` using either local/dev simulation or real SMTP delivery with persisted status/history.
 - **Tracked email feedback:** each delivered article includes normal links for Interesting, Neutral, and Not interesting actions. The links call `GET /feedback/click` and update preferences for future digests.
 - **Broader sources:** default RSS seeding now covers general news, world/news, technology, business/finance, science, and sports sources.
 - **Expanded topics:** classification includes sports (`football`, `basketball`, `tennis`), politics/world/Israel, technology/AI/cybersecurity, business/finance/startups, science/health/climate, and culture/entertainment/gaming.
@@ -286,4 +286,4 @@ Realistic next steps:
 
 ## Current non-goals
 
-The project intentionally does not include authentication, AI-generated summaries, deployment automation, React, Telegram integration, or real email sending. Those would be reasonable future additions, but the current focus is the backend data and recommendation pipeline.
+The project intentionally does not include authentication, AI-generated summaries, deployment automation, React, or Telegram integration. Those would be reasonable future additions, but the current focus is the backend data and recommendation pipeline.

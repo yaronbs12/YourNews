@@ -26,7 +26,7 @@ from app.delivery.service import (
     get_delivery,
     list_digest_deliveries,
     render_digest_delivery_preview,
-    send_digest_local_email,
+    send_digest_email,
 )
 from app.digests.service import DigestUserNotFoundError, EmptyDigestError, generate_digest_for_user
 from app.models.article import Article
@@ -258,9 +258,11 @@ def get_digest_delivery_preview(digest_id: int, db: Session = Depends(get_db)) -
 @router.post("/digests/{digest_id}/send", response_model=DigestDeliveryRead)
 def send_digest(digest_id: int, db: Session = Depends(get_db)) -> DigestDeliveryRead:
     try:
-        delivery = send_digest_local_email(db, digest_id)
+        delivery = send_digest_email(db, digest_id)
     except DigestDeliveryNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if delivery.status.name == "FAILED":
+        raise HTTPException(status_code=502, detail=delivery.error_message or "Digest email delivery failed")
     return _delivery_to_read(delivery)
 
 
@@ -344,7 +346,7 @@ def click_feedback(
     label_text = feedback.label.value.replace("_", " ")
     article_text = f" for <strong>{escape(article.title)}</strong>" if article else ""
     html = _feedback_confirmation_html(
-        title="Feedback saved",
+        title="Thanks, your feedback was saved.",
         body=(
             f"Saved <strong>{escape(label_text)}</strong>{article_text}. "
             "Future YourNews digests will use this signal to improve your recommendations."
