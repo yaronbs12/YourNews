@@ -284,7 +284,7 @@ def _render_html_body(
               <div style="font-size:12px;font-weight:700;color:#2563eb;">#{item.rank} · {escape(source_name)}</div>
               <h2 style="font-size:18px;margin:6px 0 8px 0;"><a href="{escape(article.url)}" style="color:#0f172a;text-decoration:none;">{escape(article.title)}</a></h2>
               <div style="margin:8px 0;">{topic_html}</div>
-              <div style="margin:8px 0;color:#475569;font-size:13px;">Score: {item.rank}</div>
+              <div style="margin:8px 0;color:#475569;font-size:13px;">Rank: {item.rank}</div>
               <a href="{escape(article.url)}" style="color:#2563eb;">Read article</a>
               {feedback_html}
             </li>

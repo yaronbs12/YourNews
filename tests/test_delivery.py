@@ -344,6 +344,8 @@ def test_send_digest_smtp_success_path_uses_mocked_smtp() -> None:
         "app.delivery.service.settings.smtp_password", "pass"
     ), patch(
         "app.delivery.service.settings.smtp_from_email", "no-reply@example.com"
+    ), patch(
+        "app.delivery.service.settings.app_base_url", "https://demo.yournews.dev"
     ), patch("app.delivery.service.smtplib.SMTP") as smtp_cls:
         response = client.post(f"/digests/{digest_id}/send")
 
@@ -351,6 +353,8 @@ def test_send_digest_smtp_success_path_uses_mocked_smtp() -> None:
     payload = response.json()
     assert payload["provider"] == "smtp"
     assert payload["status"] == "SENT"
+    assert "https://demo.yournews.dev/feedback/click" in payload["text_body"]
+    assert "https://demo.yournews.dev/feedback/click" in payload["html_body"]
     smtp_cls.assert_called_once()
 
 

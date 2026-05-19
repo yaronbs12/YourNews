@@ -189,6 +189,8 @@ Send a digest through the configured provider (`EMAIL_PROVIDER=local` for simula
 curl -X POST "http://127.0.0.1:8000/digests/{digest_id}/send"
 ```
 
+For real SMTP email testing, `APP_BASE_URL` must be a publicly reachable backend URL so feedback links work outside your machine. `localhost`/`127.0.0.1` only works for local self-testing.
+
 List delivery history for a digest or inspect one stored delivery:
 
 ```bash
@@ -260,6 +262,17 @@ Run a syntax/bytecode check for the application package:
 ```bash
 python -m compileall app
 ```
+
+## Manual SMTP end-to-end check
+
+1. Set `EMAIL_PROVIDER=smtp`.
+2. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`, `SMTP_USE_TLS`.
+3. Set `APP_BASE_URL` to a publicly reachable backend URL.
+4. Generate a digest (`POST /digests/generate`).
+5. Send it (`POST /digests/{digest_id}/send`).
+6. Open the email and click a feedback link.
+7. Confirm the feedback-saved HTML page appears.
+8. Generate another digest and verify updated preferences can change ranking.
 
 ## What this project demonstrates
 
