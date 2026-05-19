@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import escape
+from email.message import EmailMessage
+import smtplib
 from secrets import token_urlsafe
 from urllib.parse import urlencode
 
@@ -27,6 +29,10 @@ class DeliveryPreviewNotFoundError(LookupError):
 
 
 class DigestDeliveryNotFoundError(LookupError):
+    pass
+
+
+class EmailDeliveryConfigurationError(ValueError):
     pass
 
 
@@ -74,18 +80,19 @@ def render_digest_delivery_preview(session: Session, digest_id: int) -> Delivery
     )
 
 
-def send_digest_local_email(session: Session, digest_id: int) -> DigestDelivery:
+def send_digest_email(session: Session, digest_id: int) -> DigestDelivery:
     digest = session.get(Digest, digest_id)
     if digest is None:
         raise DigestDeliveryNotFoundError("Digest not found")
 
     user = session.get(User, digest.user_id)
     subject = _digest_subject(digest.id)
+    provider = settings.email_provider.lower()
     delivery = DigestDelivery(
         digest_id=digest.id,
         user_id=digest.user_id,
         channel="email",
-        provider="local",
+        provider=provider,
         recipient_email=user.email if user else None,
         subject=subject,
         html_body="",
@@ -105,6 +112,7 @@ def send_digest_local_email(session: Session, digest_id: int) -> DigestDelivery:
         session=session,
         email=user.email if user else None,
         feedback_context=feedback_context,
+        provider=provider,
     )
     delivery.html_body = _render_html_body(
         subject=subject,
@@ -113,9 +121,25 @@ def send_digest_local_email(session: Session, digest_id: int) -> DigestDelivery:
         session=session,
         email=user.email if user else None,
         feedback_context=feedback_context,
+        provider=provider,
     )
-    delivery.status = DigestDeliveryStatus.SENT
-    delivery.sent_at = datetime.now(UTC)
+    if provider == "local":
+        delivery.status = DigestDeliveryStatus.SENT
+        delivery.sent_at = datetime.now(UTC)
+    elif provider == "smtp":
+        try:
+            _send_via_smtp(delivery)
+            delivery.status = DigestDeliveryStatus.SENT
+            delivery.sent_at = datetime.now(UTC)
+        except EmailDeliveryConfigurationError as exc:
+            delivery.status = DigestDeliveryStatus.FAILED
+            delivery.error_message = str(exc)
+        except Exception as exc:  # noqa: BLE001
+            delivery.status = DigestDeliveryStatus.FAILED
+            delivery.error_message = f"SMTP send failed: {exc}"
+    else:
+        delivery.status = DigestDeliveryStatus.FAILED
+        delivery.error_message = f"Unsupported email provider: {settings.email_provider}"
     session.commit()
     session.refresh(delivery)
     return delivery
@@ -145,7 +169,7 @@ class FeedbackLinkContext:
 
 
 def _digest_subject(digest_id: int) -> str:
-    return f"YourNews digest #{digest_id}"
+    return f"YourNews Daily Digest #{digest_id}"
 
 
 def _digest_article_rows(session: Session, digest_id: int) -> list[tuple[DigestItem, Article, str]]:
@@ -187,11 +211,12 @@ def _render_text_body(
     session: Session,
     email: str | None,
     feedback_context: FeedbackLinkContext | None,
+    provider: str = "local",
 ) -> str:
     lines = [subject, f"Created: {created_at.isoformat()}"]
     if email:
         lines.append(f"To: {email}")
-    if feedback_context:
+    if feedback_context and provider == "local":
         lines.append("Delivery: local/dev email simulation (no external email sent)")
     lines.append("")
 
@@ -221,13 +246,14 @@ def _render_html_body(
     session: Session,
     email: str | None,
     feedback_context: FeedbackLinkContext | None,
+    provider: str = "local",
 ) -> str:
     recipient = f'<p style="color:#64748b;">To: {escape(email)}</p>' if email else ""
     delivery_note = (
         '<p style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;color:#92400e;padding:10px 12px;">'
         "Local/dev email simulation — no external email was sent. Use the feedback buttons to record tracked signals."
         "</p>"
-        if feedback_context
+        if feedback_context and provider == "local"
         else ""
     )
     items = []
@@ -258,6 +284,7 @@ def _render_html_body(
               <div style="font-size:12px;font-weight:700;color:#2563eb;">#{item.rank} · {escape(source_name)}</div>
               <h2 style="font-size:18px;margin:6px 0 8px 0;"><a href="{escape(article.url)}" style="color:#0f172a;text-decoration:none;">{escape(article.title)}</a></h2>
               <div style="margin:8px 0;">{topic_html}</div>
+              <div style="margin:8px 0;color:#475569;font-size:13px;">Score: {item.rank}</div>
               <a href="{escape(article.url)}" style="color:#2563eb;">Read article</a>
               {feedback_html}
             </li>
@@ -279,3 +306,32 @@ def _render_html_body(
       </body>
     </html>
     """.strip()
+
+
+def _send_via_smtp(delivery: DigestDelivery) -> None:
+    required = {
+        "SMTP_HOST": settings.smtp_host,
+        "SMTP_USERNAME": settings.smtp_username,
+        "SMTP_PASSWORD": settings.smtp_password,
+        "SMTP_FROM_EMAIL": settings.smtp_from_email,
+    }
+    missing = [key for key, value in required.items() if not value]
+    if missing:
+        raise EmailDeliveryConfigurationError(f"Missing SMTP config: {', '.join(missing)}")
+    if settings.smtp_port <= 0:
+        raise EmailDeliveryConfigurationError("SMTP_PORT must be a positive integer")
+    if not delivery.recipient_email:
+        raise EmailDeliveryConfigurationError("Recipient email is required for SMTP delivery")
+
+    message = EmailMessage()
+    message["Subject"] = delivery.subject
+    message["From"] = f"{settings.smtp_from_name} <{settings.smtp_from_email}>"
+    message["To"] = delivery.recipient_email
+    message.set_content(delivery.text_body)
+    message.add_alternative(delivery.html_body, subtype="html")
+
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
+        if settings.smtp_use_tls:
+            smtp.starttls()
+        smtp.login(settings.smtp_username, settings.smtp_password)
+        smtp.send_message(message)

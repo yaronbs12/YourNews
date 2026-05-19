@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -307,3 +308,73 @@ def test_feedback_click_rejects_invalid_label() -> None:
     assert response.status_code == 400
     assert "text/html" in response.headers["content-type"]
     assert "Invalid feedback label" in response.text
+
+
+def test_send_digest_smtp_missing_config_fails_gracefully() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+
+    with patch("app.delivery.service.settings.email_provider", "smtp"), patch(
+        "app.delivery.service.settings.smtp_host", None
+    ):
+        response = client.post(f"/digests/{digest_id}/send")
+
+    assert response.status_code == 502
+    assert "Missing SMTP config" in response.json()["detail"]
+    with SessionLocal() as session:
+        delivery = session.scalar(select(DigestDelivery).where(DigestDelivery.digest_id == digest_id))
+        assert delivery is not None
+        assert delivery.provider == "smtp"
+        assert delivery.status.name == "FAILED"
+
+
+def test_send_digest_smtp_success_path_uses_mocked_smtp() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+
+    with patch("app.delivery.service.settings.email_provider", "smtp"), patch(
+        "app.delivery.service.settings.smtp_host", "smtp.example.com"
+    ), patch("app.delivery.service.settings.smtp_port", 587), patch(
+        "app.delivery.service.settings.smtp_username", "user"
+    ), patch(
+        "app.delivery.service.settings.smtp_password", "pass"
+    ), patch(
+        "app.delivery.service.settings.smtp_from_email", "no-reply@example.com"
+    ), patch("app.delivery.service.smtplib.SMTP") as smtp_cls:
+        response = client.post(f"/digests/{digest_id}/send")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"] == "smtp"
+    assert payload["status"] == "SENT"
+    smtp_cls.assert_called_once()
+
+
+def test_send_digest_smtp_failure_path_is_persisted() -> None:
+    client, SessionLocal = _client_and_sessionmaker()
+    with SessionLocal() as session:
+        digest = _create_digest_fixture(session)
+        digest_id = digest.id
+
+    with patch("app.delivery.service.settings.email_provider", "smtp"), patch(
+        "app.delivery.service.settings.smtp_host", "smtp.example.com"
+    ), patch("app.delivery.service.settings.smtp_port", 587), patch(
+        "app.delivery.service.settings.smtp_username", "user"
+    ), patch(
+        "app.delivery.service.settings.smtp_password", "pass"
+    ), patch(
+        "app.delivery.service.settings.smtp_from_email", "no-reply@example.com"
+    ), patch("app.delivery.service.smtplib.SMTP", side_effect=RuntimeError("boom")):
+        response = client.post(f"/digests/{digest_id}/send")
+
+    assert response.status_code == 502
+    assert "SMTP send failed" in response.json()["detail"]
+    with SessionLocal() as session:
+        delivery = session.scalar(select(DigestDelivery).where(DigestDelivery.digest_id == digest_id))
+        assert delivery is not None
+        assert delivery.status.name == "FAILED"
+        assert delivery.error_message is not None
