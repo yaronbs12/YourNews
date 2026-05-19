@@ -251,17 +251,19 @@ For the API outside Docker, set `DATABASE_URL` to a reachable PostgreSQL databas
 
 ## Testing
 
-Run the full test suite:
-
-```bash
-pytest
-```
-
 Run a syntax/bytecode check for the application package:
 
 ```bash
 python -m compileall app
 ```
+
+Run the full test suite (requires dependencies to be installed in the active environment):
+
+```bash
+pytest
+```
+
+If `pytest` fails due to missing local dependencies, install requirements first or run tests in Docker before final project closure.
 
 ## Manual SMTP end-to-end check
 
